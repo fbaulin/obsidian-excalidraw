@@ -1,3 +1,24 @@
+# Candidate 5 — actual context-menu and keyboard event routing
+
+The user reports candidate 4 still fails image copy, while Save as editable SVG
+renders formulas correctly. Investigation of the shipped Obsidian engine shows
+`getContextMenuItems` retains original `actionCopyAsPng/actionCopyAsSvg` objects
+and `executeAction(item)` invokes them directly. Replacing the action registry
+does not replace those menu objects. Earlier action-registry mocks missed this.
+
+Mounted drawing views now capture their own image-copy menu clicks and
+Alt+Shift+C, using the host export manager. PNG clipboard rendering explicitly
+rasterizes `getSVG`, the route used by the working editable-SVG save command.
+Text inputs and other views are excluded; React effect cleanup removes handlers.
+A success notice identifies the new path; failures display an error notice.
+
+Real Edge DOM event regression fixture:
+`node scripts/testing/mathCopyBrowser.mjs math-copy-browser.html`, then open the
+generated HTML in a browser. It tests nested menu targets, retained native action
+bypass, PNG/SVG routing, Alt+Shift+C, text-input exclusion, other-view isolation,
+and cleanup. It does not certify the actual Windows clipboard inside Obsidian.
+Native action registration remains for action-palette/API consumers.
+
 # SVG v1.1.1 / Obsidian 1.6.5 compatibility candidate 1
 
 ## Candidate 4: shortcut regression and export gating

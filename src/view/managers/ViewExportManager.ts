@@ -711,11 +711,10 @@ export class ViewExportManager {
       return;
     }
 
-    const png = await this.png(
-      this.view.getScene(selectedOnly),
-      undefined,
-      embedScene,
-    );
+    // Use exactly the preview route used by Save as editable SVG, including
+    // its formula overlay, instead of a separate native canvas exporter.
+    const svg = await this.getSVG(embedScene, selectedOnly);
+    const png = await rasterizeMathSvg(svg, this.getViewExportScale());
     if (!png) {
       return;
     }

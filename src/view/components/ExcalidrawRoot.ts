@@ -1,3 +1,5 @@
+import { installMathCopyEvents } from "../../svgPersistence/mathCopyEvents";
+import { Notice } from "obsidian";
 import {
   AppState,
   ExcalidrawInitialDataState,
@@ -56,6 +58,24 @@ export function createExcalidrawRootElement(
   const { Excalidraw } = view.packages.excalidrawLib;
 
   const excalidrawWrapperRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const root = excalidrawWrapperRef.current;
+    if (!root) return;
+    return installMathCopyEvents(root, async format => {
+      const api = view.excalidrawAPI;
+      if (!api || api.isDestroyed) throw new Error("Drawing is not ready");
+      const selected = Object.values(api.getAppState().selectedElementIds).some(Boolean);
+      if (format === "png") await view.exportPNGToClipboard(false, selected);
+      else {
+        const svg = await view.getSVG(false, selected);
+        await root.ownerDocument.defaultView.navigator.clipboard.writeText(svg.outerHTML);
+      }
+      new Notice(`Copied ${format.toUpperCase()} with SVG formula rendering`);
+    }, error => {
+      console.error("SVG fork: image copy failed", error);
+      new Notice(`Image copy failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }, [view]);
   const toolsPanelRef = React.useRef<ToolsPanel>(null);
   const embeddableMenuRef = React.useRef<HTMLDivElement>(null);
   const selectionBeforePointerDown = React.useRef<AppState>(null);
