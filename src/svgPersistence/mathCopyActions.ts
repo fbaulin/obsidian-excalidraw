@@ -22,6 +22,10 @@ export function registerMathCopyActions(
       name,
       label,
       trackEvent: false,
+      // registerAction replaces the whole native action, including its shortcut.
+      keyTest: name === "copyAsPng"
+        ? event => event.code === "KeyC" && event.altKey && event.shiftKey
+        : undefined,
       keywords: [name === "copyAsSvg" ? "svg" : "png", "clipboard", "copy"],
       predicate: elements => elements.some(element => !element.isDeleted),
       perform: async (_elements, appState) => {

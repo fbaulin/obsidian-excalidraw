@@ -1,5 +1,21 @@
 # SVG v1.1.1 / Obsidian 1.6.5 compatibility candidate 1
 
+## Candidate 4: shortcut regression and export gating
+
+- Restore native Alt+Shift+C (`KeyC`, Alt, Shift) on the replacement PNG copy
+  action. The candidate 3 replacement omitted `keyTest`; this regression is
+  confirmed and now covered by a behavioral test.
+- Run the SVG math renderer against actual exported text regardless of the
+  scene's cached `originalText`. Check both `text` and `originalText` when
+  detecting math; rasterize rendered SVG if it contains math groups.
+- Add an integration test exercising real `ViewExportManager.getSVG()` and
+  `svg()` with a stale source-text cache, plus a native-browser DOM smoke test
+  performed externally in headless Edge. Eighteen compatibility tests pass.
+- The user's continuing raw-LaTeX output has NOT been reproduced in a running
+  Obsidian renderer. The stale cache is a tested failure mode, not a confirmed
+  diagnosis of that drawing. Clipboard/PNG acceptance inside Obsidian remains
+  required; do not label that issue fully resolved from these tests.
+
 ## Candidate 3 — math in copied/exported images
 
 - User confirmed candidate 2 starts in Obsidian 1.6.5.

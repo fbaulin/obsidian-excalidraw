@@ -63,6 +63,57 @@ test("native SVG and PNG copy actions use host exporter for selection and full c
     await action.perform([], { selectedElementIds: {} });
   }
   assert.deepEqual(copies, [["svg", true], ["svg", false], ["png", true], ["png", false]]);
+  const png = actions.get("copyAsPng");
+  assert.equal(png.keyTest({ code: "KeyC", altKey: true, shiftKey: true }), true);
+  assert.equal(png.keyTest({ code: "KeyC", altKey: false, shiftKey: true }), false);
+  assert.equal(png.keyTest({ code: "KeyV", altKey: true, shiftKey: true }), false);
+  assert.equal(actions.get("copyAsSvg").keyTest, undefined);
+});
+test("math detection does not discard rendered text when originalText is stale", () => {
+  const { hasMathText } = load("src/svgPersistence/mathSceneHasText");
+  assert.equal(hasMathText({ elements: [{ type: "text", originalText: "", text: "$x_1$" }] }), true);
+  assert.equal(hasMathText({ elements: [{ type: "text", originalText: "xx", text: "xx $Y^2$" }] }), true);
+  assert.equal(hasMathText({ elements: [{ type: "text", isDeleted: true, text: "$x$" }] }), false);
+});
+test("actual export manager typesets clipboard SVG even without math in the source cache", async () => {
+  const { DOMParser } = nativeRequire("@xmldom/xmldom");
+  const previousParser = globalThis.DOMParser;
+  globalThis.DOMParser = DOMParser;
+  try {
+    const filename = path.join(root, "src/view/managers/ViewExportManager.ts");
+    const compiled = ts.transpileModule(fs.readFileSync(filename, "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    });
+    const module = { exports: {} };
+    const require = name => name.startsWith("../../svgPersistence/")
+      ? load("src/svgPersistence/" + name.split("/").at(-1))
+      : {};
+    new Function("require", "module", "exports", compiled.outputText)(require, module, module.exports);
+    const scene = { elements: [{ type: "text", originalText: "", text: "xx $Y^2$" }], appState: {} };
+    const view = { file: { extension: "md" }, excalidrawAPI: {}, getScene: selected => {
+      assert.equal(selected, true);
+      return scene;
+    } };
+    const manager = new module.exports.ViewExportManager(view, {
+      isMaskFile: () => false,
+      getSVG: async () => new DOMParser().parseFromString(
+        '<svg xmlns="http://www.w3.org/2000/svg"><g transform="translate(20 40)"><text x="0" y="20" font-size="20px">xx $Y^2$</text></g></svg>',
+        "image/svg+xml").documentElement,
+    });
+    // Isolate settings/file loading, but run the actual svg() and getSVG() methods.
+    manager.getViewExportWithBackground = () => false;
+    manager.getViewExportTheme = () => "light";
+    manager.getViewExportEmbedScene = () => false;
+    manager.getViewExportPadding = () => 10;
+    manager.loadFilesForExport = async () => undefined;
+    const svg = await manager.getSVG(false, true);
+    assert.ok(svg.getElementsByTagName("path").length > 0);
+    assert.doesNotMatch(Array.from(svg.getElementsByTagName("text"), el => el.textContent).join(""), /\$|Y\^2/);
+    assert.equal(scene.elements[0].text, "xx $Y^2$");
+  } finally {
+    if (previousParser === undefined) delete globalThis.DOMParser;
+    else globalThis.DOMParser = previousParser;
+  }
 });
 test("clipboard failure is visible without changing scene or undo history", async () => {
   let action;
