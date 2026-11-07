@@ -447,7 +447,7 @@ export class ViewExportManager {
       overrideFiles ?? undefined,
     );
     // SVG_FORK_MATH_COPY_V111: all exports, including selection-only and clipboard SVG.
-    if(this.view.file?.extension === 'svg' && svgWithMath) {
+    if(svgWithMath && hasMathText(scene)) {
       const result=overlayMathInSvg(svgWithMath,scene,texToSvg);
       if(result.skipped)console.warn('SVG fork: skipped LaTeX during export',result.skipped);
     }
@@ -612,7 +612,7 @@ export class ViewExportManager {
     embedScene?: boolean,
   ): Promise<Blob> {
     // SVG_FORK_MATH_PNG_V111: rasterize the fully typeset SVG, never raw TeX.
-    if(this.view.file?.extension === 'svg' && hasMathText(scene)) {
+    if(hasMathText(scene)) {
       const rendered=await this.svg(scene,theme,embedScene,true);
       return rasterizeMathSvg(rendered,this.getViewExportScale());
     }

@@ -1,4 +1,5 @@
 import {CanvasMathOverlay} from '../svgPersistence/canvasMathOverlay';
+import { registerMathCopyActions } from "../svgPersistence/mathCopyActions";
 import {LiveTextResize} from '../svgPersistence/liveTextResize';
 import {FixedTextLayout} from '../svgPersistence/fixedTextLayout';
 import { getNoticeElement } from "../compatibility/host";
@@ -7718,7 +7719,19 @@ export default class ExcalidrawView
   }
 
   public setExcalidrawAPI(api: ExcalidrawImperativeAPI | null) {
+    const previousApi = this.excalidrawAPI;
     this.excalidrawAPI = api;
+    if (api && api !== previousApi) {
+      registerMathCopyActions(api, {
+        captureUpdateNever: CaptureUpdateAction.NEVER,
+        copySvg: async selectedOnly => {
+          const svg = await this.getSVG(false, selectedOnly);
+          if (!svg) throw new Error("SVG export failed");
+          await this.ownerDocument.defaultView.navigator.clipboard.writeText(svg.outerHTML);
+        },
+        copyPng: selectedOnly => this.exportPNGToClipboard(false, selectedOnly),
+      });
+    }
     // Chasing ghosts: https://github.com/zsviczian/obsidian-excalidraw-plugin/issues/2810
     if (!api || this.pendingUIMode === null) {
       return;

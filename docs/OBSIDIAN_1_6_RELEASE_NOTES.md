@@ -1,5 +1,22 @@
 # SVG v1.1.1 / Obsidian 1.6.5 compatibility candidate 1
 
+## Candidate 3 — math in copied/exported images
+
+- User confirmed candidate 2 starts in Obsidian 1.6.5.
+- Override per-editor native Copy as SVG/PNG actions through the public
+  `registerAction` API: those actions previously bypassed the host math exporter.
+- Apply vector math export to Markdown-backed drawings too, not just `.svg` files.
+- PNG output uses the math-expanded SVG rasterizer; formula source and scene
+  elements are not converted into images or modified by copying.
+- Tests exercise native action routing, selection/full-canvas behavior,
+  clipboard errors and real MathJax replacement of standalone and centered
+  shape-label SVG text, based on the reported failing export.
+- Manual acceptance still required: copy selected text and shape labels as SVG
+  and PNG, export using the host dialog, confirm vector formulas/no raw dollars,
+  then reopen and edit the original formula source.
+- This does not replace the engine's unrelated programmatic `exportToBlob`
+  calls in optional AI integrations or implement multiline positioned tspans.
+
 ## Candidate 2 — reported plugin-load failure
 
 User runtime evidence: Obsidian 1.6.5 failed at plugin module evaluation with

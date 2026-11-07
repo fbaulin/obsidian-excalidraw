@@ -26,6 +26,55 @@ function load(relative) {
 }
 
 const host = load("src/compatibility/host");
+test("exported standalone and centered shape-label SVG text becomes real vector math", () => {
+  const { DOMParser, XMLSerializer } = nativeRequire("@xmldom/xmldom");
+  const parseXml = source => new DOMParser().parseFromString(source, "image/svg+xml");
+  const svg = parseXml(`<svg xmlns="http://www.w3.org/2000/svg"><g transform="translate(203 201)"><text x="0" y="17.62" font-size="20px">xxkk</text><text x="0" y="42.62" font-size="20px">$x_1$</text></g><g transform="translate(343 242)"><text x="47.98" y="17.62" font-size="20px" text-anchor="middle">xx $Y^2$</text></g></svg>`).documentElement;
+  const { overlayMathInSvg } = load("src/svgPersistence/mathSvgOverlay");
+  const { texToSvg } = load("src/svgPersistence/mathjaxRenderer");
+  const result = overlayMathInSvg(svg, { elements: [] }, texToSvg, {
+    parseXml, measureText: text => text.length * 10,
+  });
+  assert.equal(result.converted, 2);
+  assert.equal(result.skipped, 0);
+  assert.ok(svg.getElementsByTagName("path").length > 0);
+  const visible = Array.from(svg.getElementsByTagName("text"), text => text.textContent).join(" ");
+  assert.match(visible, /xxkk/);
+  assert.match(visible, /xx /);
+  assert.doesNotMatch(visible, /\$|x_1|Y\^2/);
+  const serialized = new XMLSerializer().serializeToString(svg);
+  assert.match(serialized, /translate\(343 242\)/);
+  assert.match(serialized, /data-latex-source="xx \$Y\^2\$"/);
+  assert.equal(overlayMathInSvg(svg, {}, texToSvg, { parseXml }).converted, 0);
+});
+test("native SVG and PNG copy actions use host exporter for selection and full canvas", async () => {
+  const actions = new Map(), copies = [];
+  const { registerMathCopyActions } = load("src/svgPersistence/mathCopyActions");
+  registerMathCopyActions({ registerAction: action => actions.set(action.name, action) }, {
+    captureUpdateNever: "NEVER",
+    copySvg: async selected => copies.push(["svg", selected]),
+    copyPng: async selected => copies.push(["png", selected]),
+  });
+  for (const name of ["copyAsSvg", "copyAsPng"]) {
+    const action = actions.get(name);
+    assert.equal(action.predicate([{ isDeleted: true }]), false);
+    assert.equal(action.predicate([{ isDeleted: false }]), true);
+    assert.deepEqual(await action.perform([], { selectedElementIds: { label: true } }), { captureUpdate: "NEVER" });
+    await action.perform([], { selectedElementIds: {} });
+  }
+  assert.deepEqual(copies, [["svg", true], ["svg", false], ["png", true], ["png", false]]);
+});
+test("clipboard failure is visible without changing scene or undo history", async () => {
+  let action;
+  const { registerMathCopyActions } = load("src/svgPersistence/mathCopyActions");
+  registerMathCopyActions({ registerAction: registered => { action = registered; } }, {
+    captureUpdateNever: "NEVER", copySvg: async () => {},
+    copyPng: async () => { throw Error("Clipboard permission denied"); },
+  });
+  assert.deepEqual(await action.perform([], { selectedElementIds: {} }), {
+    captureUpdate: "NEVER", appState: { errorMessage: "Clipboard permission denied" },
+  });
+});
 test("CSS editor module evaluates without loading incompatible CSS parser", () => {
   const source = fs.readFileSync(path.join(root, "src/view/sidepanel/CSSCodeEditor.ts"), "utf8");
   const compiled = ts.transpileModule(source, {
