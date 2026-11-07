@@ -26,6 +26,29 @@ function load(relative) {
 }
 
 const host = load("src/compatibility/host");
+test("CSS editor module evaluates without loading incompatible CSS parser", () => {
+  const source = fs.readFileSync(path.join(root, "src/view/sidepanel/CSSCodeEditor.ts"), "utf8");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  });
+  let grammarLoads = 0;
+  const require = name => {
+    if (name === "@codemirror/lang-css") {
+      grammarLoads++;
+      throw new TypeError("Cannot read properties of undefined (reading 'deserialize')");
+    }
+    if (name.endsWith("compatibility/host")) return host;
+    if (name === "@lezer/common") return { NodeProp: {} };
+    if (name === "@lezer/highlight") return { tags: new Proxy({}, { get: () => ({}) }) };
+    if (name === "@codemirror/language") return { HighlightStyle: { define: rules => rules } };
+    if (name.startsWith("@codemirror/")) return {};
+    throw Error(`Unexpected dependency: ${name}`);
+  };
+  const module = { exports: {} };
+  new Function("require", "module", "exports", compiled.outputText)(require, module, module.exports);
+  assert.equal(typeof module.exports.CSSCodeEditor, "function");
+  assert.equal(grammarLoads, 0);
+});
 test("notices prefer modern message element and fall back to legacy container", () => {
   const legacy = {};
   const modern = {};

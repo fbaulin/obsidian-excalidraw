@@ -4,7 +4,9 @@ import {
   historyKeymap,
   indentWithTab,
 } from "@codemirror/commands";
-import { css } from "@codemirror/lang-css";
+// Intentionally no @codemirror/lang-css import: its bundled grammar requires
+// NodeProp.isolate, absent in Obsidian 1.6.5's external Lezer runtime. Even a
+// dynamic import is evaluated eagerly by our inlineDynamicImports build.
 import {
   bracketMatching,
   HighlightStyle,
@@ -257,7 +259,6 @@ export class CSSCodeEditor {
           indentOnInput(),
           bracketMatching(),
           syntaxHighlighting(obsidianCSSHighlightStyle),
-          css(),
           EditorView.lineWrapping,
           highlightActiveLine(),
           keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),

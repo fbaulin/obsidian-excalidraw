@@ -1,5 +1,25 @@
 # SVG v1.1.1 / Obsidian 1.6.5 compatibility candidate 1
 
+## Candidate 2 — reported plugin-load failure
+
+User runtime evidence: Obsidian 1.6.5 failed at plugin module evaluation with
+`TypeError: Cannot read properties of undefined (reading 'deserialize')`.
+The supplied plugin position maps to `@lezer/css`'s `LRParser.deserialize`.
+The installed host app position maps to NodeProp lookup/deserialization.
+The bundled CSS grammar uses `NodeProp.isolate`, absent from that host runtime.
+
+Removed the eager `@codemirror/lang-css` import from the optional sidepanel CSS
+editor. Basic CodeMirror text editing, history and boilerplate insertion remain;
+CSS grammar highlighting/completion is unavailable on this compatibility branch
+(including newer hosts). No engine/dependency downgrade or global NodeProp
+mutation. Dynamic imports are not a safe guard in this single-file build:
+Rollup's `inlineDynamicImports` can eagerly evaluate those modules.
+
+Added a behavioral module-evaluation regression test with an incompatible grammar
+loader that throws if invoked. Candidate version: `2.29.0-svg.11.1-compat.2`.
+Re-enabling the rebuilt plugin in the user's host is still required to confirm
+the reported failure is resolved and discover any subsequent host issues.
+
 **Experimental, not verified inside an Obsidian 1.6.5 renderer.** The manifest
 minimum permits testing; it is not a runtime certification. See
 `OBSIDIAN_1_6_COMPATIBILITY.md` for the outstanding acceptance matrix.
