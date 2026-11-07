@@ -1,3 +1,6 @@
+import {CanvasMathOverlay} from '../svgPersistence/canvasMathOverlay';
+import {LiveTextResize} from '../svgPersistence/liveTextResize';
+import {FixedTextLayout} from '../svgPersistence/fixedTextLayout';
 import {
   Editor,
   TextFileView,
@@ -57,6 +60,9 @@ import {
   sceneCoordsToViewportCoords,
 } from "../constants/constants";
 import ExcalidrawPlugin from "../core/main";
+import {saveEditableSvg,loadEditableSvg,isEditableExcalidrawSvg,asInternalMarkdown} from "../svgPersistence/editableSvgCodec";
+import {overlayMathInSvg} from "../svgPersistence/mathSvgOverlay";
+import {texToSvg} from "../svgPersistence/mathjaxRenderer";
 import {
   ExcalidrawAutomate,
   type ViewLinkClickHook,
@@ -1221,7 +1227,7 @@ export default class ExcalidrawView
                 autoexportRequest,
               },
             });
-            this.data = d;
+            this.data = asInternalMarkdown(d, this.file?.extension === "svg");
             return {
               status: "window-migration-handed-off",
               preparedSave,
@@ -1254,7 +1260,7 @@ export default class ExcalidrawView
               }
             },
           );
-          this.data = d;
+          this.data = asInternalMarkdown(d, this.file?.extension === "svg");
           this.lastSavedData = d;
           this.lastSaveTimestamp = file.stat.mtime;
           return { status: "window-migration-persisted", preparedSave };
@@ -1299,6 +1305,7 @@ export default class ExcalidrawView
             preparedSave.filePath,
             async () => {
               await super.save();
+               if (this.file?.extension === "svg") this.data = loadEditableSvg(preparedSave.text);
               reloadIfWriteDidNotEmitModify =
                 this.lastSaveTimestamp === this.file.stat.mtime &&
                 !suppressReloadFromOwnWrite &&
@@ -1372,6 +1379,8 @@ export default class ExcalidrawView
       return;
     }
 
+    sourceTextSnapshot = asInternalMarkdown(sourceTextSnapshot,
+      this.file?.extension === "svg" && /<svg\b/i.test(sourceTextSnapshot));
     const captureScene = typeof sceneSnapshot === "undefined";
     const scene = captureScene ? this.getScene() : sceneSnapshot;
     if (!scene) {
@@ -1453,7 +1462,14 @@ export default class ExcalidrawView
       const result = header + generated + tail;
 
       this.excalidrawData.disableCompression = false;
-      this.preparedSaveText = result;
+      if (this.file?.extension === "svg") {
+        const exported = await this.getSVG(false, false);
+        const math = overlayMathInSvg(exported, scene, texToSvg);
+        if (math.skipped) console.warn("SVG math spans not matched to native SVG text nodes:", math.skipped);
+        this.preparedSaveText = saveEditableSvg(exported.outerHTML, result, scene);
+      } else {
+        this.preparedSaveText = result;
+      }
       return;
     }
     if (this.compatibilityMode) {
@@ -1939,7 +1955,7 @@ export default class ExcalidrawView
                   );
                 });
               }
-              this.data = await plugin.app.vault.read(f);
+              this.data = asInternalMarkdown(await plugin.app.vault.read(f), f.extension === "svg");
             }
             await this.saveCoordinator.flush();
           }
@@ -2633,7 +2649,7 @@ export default class ExcalidrawView
     // owner and its release grace period have settled.
     if (this.isSameFileEditingActive()) {
       if (loadOnModifyTrigger) {
-        this.data = await this.app.vault.read(this.file);
+        this.data = asInternalMarkdown(await this.app.vault.read(this.file), this.file.extension === "svg");
         this.requestExternalSynchronization(file);
       }
       return true;
@@ -2657,7 +2673,7 @@ export default class ExcalidrawView
 
     let incomingData = this.data;
     if (loadOnModifyTrigger) {
-      incomingData = await this.app.vault.read(file);
+      incomingData = asInternalMarkdown(await this.app.vault.read(file), file.extension === "svg");
     }
     try {
       if (fullreload) {
@@ -3093,7 +3109,8 @@ export default class ExcalidrawView
         this.clearViewContent();
       }
       this.lastSaveTimestamp = targetFile.stat.mtime;
-      data = this.data = data.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+      data = data.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+      data = this.data = targetFile.extension === "svg" ? loadEditableSvg(data) : data;
       if (migrationPersistenceHandoff !== null) {
         const persistenceResult = await migrationPersistenceHandoff.completion;
         if (!isCurrentLoad()) {
@@ -3718,7 +3735,8 @@ export default class ExcalidrawView
         if (isRedundantObservedSaveContent(classification)) {
           continue;
         }
-        await incomingData.loadData(data, file, getTextMode(data));
+        const drawingSource = asInternalMarkdown(data, file.extension === "svg");
+        await incomingData.loadData(drawingSource, file, getTextMode(drawingSource));
         parsedIncomingData = true;
         if (
           this.isSynchronizationTargetCurrent(filePath) &&
@@ -6003,7 +6021,13 @@ export default class ExcalidrawView
     });
   }
 
+  private readonly svgFixedText = new FixedTextLayout(this);
+  private readonly svgLiveTextResize = new LiveTextResize(this);
+  private readonly svgCanvasMath = new CanvasMathOverlay(this);
   public onChange(et: ExcalidrawElement[], st: AppState, files: BinaryFiles) {
+    this.svgCanvasMath.onChange(et, st); // v0.8: render inline math in editor
+    this.svgLiveTextResize.ensure(); // SVG fork: live, independent text box resizing
+    this.svgFixedText.onChange(et, st); // SVG fork: fixed font and resize reflow
     this.selectedElementActionsMenu?.update(et, st);
     if (st.activeTool?.type) {
       if (st.activeTool.type === "image") {

@@ -97,6 +97,10 @@ import { ObserverManager } from "./managers/ObserverManager";
 import { PackageManager } from "./managers/PackageManager";
 import { MonkeyPatchManager } from "./managers/MonkeyPatchManager";
 import ExcalidrawView from "../view/ExcalidrawView";
+import {saveEditableSvg,isEditableExcalidrawSvg} from "../svgPersistence/editableSvgCodec";
+import {asEditableScene,cleanSvgPreview} from "../svgPersistence/inlineSvgImport";
+import {overlayMathInSvg} from "../svgPersistence/mathSvgOverlay";
+import {texToSvg} from "../svgPersistence/mathjaxRenderer";
 import { ExcalidrawSidepanelView } from "../view/sidepanel/Sidepanel";
 import { CommandManager } from "./managers/CommandManager";
 import { EventManager } from "./managers/EventManager";
@@ -443,6 +447,49 @@ export default class ExcalidrawPlugin extends Plugin {
     );
     //Compatibility mode with .excalidraw files
     this.registerExtensions(["excalidraw"], VIEW_TYPE_EXCALIDRAW);
+    // SVG remains a normal image for Obsidian; editing is opt-in from the file menu.
+    this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
+      if (!(file instanceof TFile) || file.extension !== "svg") return;
+      menu.addItem(item => item.setTitle("Edit SVG as Excalidraw")
+        .setIcon("pencil").onClick(async () => {
+          const contents = await this.app.vault.read(file);
+          if (!isEditableExcalidrawSvg(contents)) {
+            // SVG_FORK_INLINE_IMPORT_V11: preserve the original as a single image.
+            const imported=asEditableScene(contents);
+            const svg=saveEditableSvg(cleanSvgPreview(contents),imported.markdown,imported.scene);
+            const base=file.path.replace(/\.svg$/i, '.pre-import.svg');
+            let backup=base,i=1;
+            while(this.app.vault.getAbstractFileByPath(backup))backup=base.replace(/\.svg$/i,'-'+(i++)+'.svg');
+            await this.app.vault.create(backup,contents); // backup before destructive conversion
+            await this.app.vault.modify(file,svg);
+            new Notice('SVG imported as one editable image object. Original saved to '+backup);
+          }
+          const leaf = this.app.workspace.getLeaf("tab");
+          await leaf.setViewState({type: VIEW_TYPE_EXCALIDRAW, state:{file:file.path}, active:true});
+          this.app.workspace.revealLeaf(leaf);
+        }));
+    }));
+    this.addCommand({id:"save-editable-svg", name:"Save current Excalidraw drawing as editable SVG",
+      checkCallback:(checking:boolean) => {
+        const view=this.app.workspace.getActiveViewOfType(ExcalidrawView);
+        if (!view?.file || view.file.extension === "svg") return false;
+        if (!checking) void (async () => {
+          await view.save();
+          const source=await this.app.vault.read(view.file);
+          const scene=view.getScene();
+          const previewSVG=await view.getSVG(false,false);
+          const math=overlayMathInSvg(previewSVG,scene,texToSvg);
+          if(math.skipped) console.warn('SVG math export skipped',math.skipped,'formula(s)');
+          const svg=saveEditableSvg(previewSVG.outerHTML,source,scene);
+          const target=view.file.path.replace(/\.(md|excalidraw)$/i,"")+".excalidraw.svg";
+          let unique=target, suffix=1;
+          while (this.app.vault.getAbstractFileByPath(unique)) { unique=target.replace(/\.svg$/i,"-"+(suffix++)+".svg"); }
+          const newFile=await this.app.vault.create(unique,svg);
+          new Notice("Created " + newFile.path + ". Keep the original drawing as a backup.");
+        })().catch(e => {console.error(e);new Notice("Could not create editable SVG");});
+        return true;
+      }
+    });
 
     addIcon(ICON_NAME, EXCALIDRAW_ICON);
     addIcon(SCRIPTENGINE_ICON_NAME, SCRIPTENGINE_ICON);

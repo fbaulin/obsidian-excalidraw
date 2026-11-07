@@ -1,3 +1,4 @@
+import {inlineVaultImage} from "src/svgPersistence/inlineImageData";
 import type React from "react";
 import ExcalidrawPlugin from "src/core/main";
 import LZString from "lz-string";
@@ -3002,6 +3003,11 @@ export class ExcalidrawAutomate {
     }
 
     const pdfLinkRegex = /^[^#]*#page=\d*(&\w*=[^&]+){0,}&rect=\d*,\d*,\d*,\d*/;
+    // SVG_FORK_INLINE_FILES_V11: insert PNG/SVG bytes, never a vault-file link.
+    if(this.targetView?.file?.extension === 'svg') {
+      const inline=await inlineVaultImage(this.plugin.app,imageFile);
+      if(inline) imageFile=inline;
+    }
     const isDataURL =
       typeof imageFile === "string" && imageFile.startsWith("data:image/");
     const originalLink = typeof imageFile === "string" ? imageFile : null;

@@ -151,14 +151,7 @@ export class LaTexPrompt extends FloatingModal {
     prompt_text?: string,
     default_value?: string,
   ): Promise<string> {
-    const mathjaxAPI = await plugin.extrasGateway.getMathJax();
-
-    if (!mathjaxAPI) {
-      return Promise.reject(
-        new Error("MathJax is not available or activation was cancelled"),
-      );
-    }
-
+    // SVG fork: render locally with bundled MathJax.
     const latexprompt = new this(app, prompt_text, default_value);
 
     return latexprompt.waitForClose;

@@ -1,0 +1,68 @@
+// @ts-nocheck
+import {splitMath} from './mathSyntax';
+const NS='http://www.w3.org/2000/svg';
+const numeric=(s,d)=>{const v=parseFloat(s);return Number.isFinite(v)?v:d;};
+const isMath=p=>p.type==='math';
+/**
+ * Replace matching SVG <text> nodes with native SVG text + MathJax path fragments.
+ * The caller supplies texToSvg(tex, display) -> serialized MathJax <svg> or <mjx-container>.
+ * This does NOT mutate Excalidraw scene elements; the original text is stored as metadata.
+ * Only exactly matched and simply laid-out single-line nodes are rewritten.
+ */
+export function overlayMathInSvg(svg,scene,texToSvg,{parseXml,measureText}={}) {
+  const parser=parseXml||(s=>new DOMParser().parseFromString(s,'image/svg+xml'));
+  const doc=svg.ownerDocument;
+  const texts=Array.from(svg.getElementsByTagName('text'));
+  let converted=0,skipped=0;
+  for(const el of (scene.elements||[])) {
+    if(el.type!=='text'||el.isDeleted)continue;
+    const source=String(el.originalText??el.text??'');
+    const parts=splitMath(source);
+    if(!parts.some(isMath))continue;
+    // Conservative: multiline/tspan layout requires renderer-specific geometry handling.
+    if(source.includes('\n')){skipped++;continue;}
+    const index=texts.findIndex(t=>t.textContent===source && !t.__mathReplaced);
+    if(index<0){skipped++;continue;}
+    const original=texts[index];original.__mathReplaced=true;
+    let x=numeric(original.getAttribute('x'),NaN),y=numeric(original.getAttribute('y'),NaN);
+    const tspan=original.getElementsByTagName('tspan')[0];
+    if(!Number.isFinite(x)&&tspan)x=numeric(tspan.getAttribute('x'),NaN);
+    if(!Number.isFinite(y)&&tspan)y=numeric(tspan.getAttribute('y'),NaN);
+    if(!Number.isFinite(x)||!Number.isFinite(y)){skipped++;continue;}
+    const fs=numeric(original.getAttribute('font-size'),numeric(el.fontSize,20));
+    const color=original.getAttribute('fill')||el.strokeColor||'#000';
+    const parent=original.parentNode;
+    const group=doc.createElementNS(NS,'g');
+    for(const attr of Array.from(original.attributes))if(['transform','opacity','clip-path'].includes(attr.name))group.setAttribute(attr.name,attr.value);
+    group.setAttribute('data-original-latex',source);
+    let cursor=x;let valid=true;
+    for(const p of parts){
+      if(p.type==='text'){
+        const t=doc.createElementNS(NS,'text');t.setAttribute('x',String(cursor));t.setAttribute('y',String(y));
+        t.setAttribute('font-size',String(fs));t.setAttribute('fill',color);
+        if(original.hasAttribute('font-family'))t.setAttribute('font-family',original.getAttribute('font-family'));
+        t.textContent=p.value;group.appendChild(t);
+        cursor+=(measureText?measureText(p.value,fs):p.value.length*fs*.53);
+      }else{
+        let rendered;
+        try {rendered=parser(texToSvg(p.value,p.display));}catch{valid=false;break;}
+        const from=rendered.getElementsByTagName('svg')[0];
+        if(!from){valid=false;break;}
+        const vb=(from.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number);
+        const widthEx=numeric(from.getAttribute('width'),NaN);
+        if(vb.length!==4||!vb.every(Number.isFinite)||!(vb[2]>0)||!(widthEx>0)){valid=false;break;}
+        const width=widthEx*fs*.5,height=width*vb[3]/vb[2];
+        const baselineY=y+vb[1]*width/vb[2];
+        const embedded=doc.importNode(from,true);
+        embedded.setAttribute('x',String(cursor));embedded.setAttribute('y',String(baselineY));
+        embedded.setAttribute('width',String(width));embedded.setAttribute('height',String(height));
+        embedded.setAttribute('color',color);embedded.setAttribute('fill',color);
+        // MathJax's fontCache:none makes individual glyph paths self-contained.
+        group.appendChild(embedded);cursor+=width;
+      }
+    }
+    if(!valid){skipped++;continue;}
+    parent.replaceChild(group,original);converted++;
+  }
+  return {converted,skipped};
+}

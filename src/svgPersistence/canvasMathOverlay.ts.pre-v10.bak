@@ -1,0 +1,133 @@
+// @ts-nocheck
+import {splitMath} from './mathSyntax';
+import {texToSvg} from './mathjaxRenderer';
+import {sceneCoordsToViewportCoords} from '../constants/constants';
+
+/** Visual-only overlay for mixed text/math and shape-bound text.
+ * Underlying text/source remains untouched. SVG export still uses the native scene.
+ * Non-interactive; the Excalidraw text editor is available on double-click.
+ */
+export class CanvasMathOverlay {
+  private view:any;
+  private host:HTMLDivElement|null=null;
+  private root:HTMLElement|null=null;
+  private pending=false;
+  private elements:any[]=[];
+  private nodes=new Map<string,HTMLElement>();
+  private mathCache=new Map<string,SVGSVGElement>();
+  private doc:Document|null=null;
+  constructor(view:any){this.view=view;}
+  onChange(elements:any[],state:any){
+    if(!this.view.file||this.view.semaphores?.viewunload){this.clear();return;}
+    this.elements=elements.filter(el=>!el.isDeleted && el.type==='text' &&
+      typeof (el.originalText??el.text)==='string' &&
+      splitMath(el.originalText??el.text).some(p=>p.type==='math'));
+    this.ensure();this.schedule();
+  }
+  private ensure(){
+    const root=this.view.contentEl as HTMLElement;
+    if(!root)return;
+    if(this.root===root && this.host)return;
+    this.clear();this.root=root;this.doc=root.ownerDocument;
+    const host=this.doc.createElement('div');host.className='svg-fork-math-overlay';
+    Object.assign(host.style,{position:'absolute',inset:'0',pointerEvents:'none',
+      overflow:'hidden',zIndex:'4',userSelect:'none'});
+    // Excalidraw view has a positioning context in upstream; this is a fallback.
+    if(this.doc.defaultView?.getComputedStyle(root).position==='static')root.style.position='relative';
+    root.appendChild(host);this.host=host;
+    root.addEventListener('wheel',this.onInteraction,true);
+    root.addEventListener('pointermove',this.onInteraction,true);
+    root.addEventListener('scroll',this.onInteraction,true);
+    this.doc.defaultView?.addEventListener('resize',this.onInteraction);
+  }
+  private onInteraction=()=>this.schedule();
+  private schedule(){
+    if(this.pending||!this.root||!this.host)return;
+    this.pending=true;
+    const w=this.doc?.defaultView;
+    if(w?.requestAnimationFrame)w.requestAnimationFrame(()=>{this.pending=false;this.render();});
+    else {this.pending=false;this.render();}
+  }
+  private render(){
+    const root=this.root,host=this.host,view=this.view,api=view.excalidrawAPI;
+    if(!root||!host||!api||api.isDestroyed||!root.isConnected||!view.file)return;
+    const state=api.getAppState();
+    const zoom=typeof state.zoom==='number'?state.zoom:Number(state.zoom?.value)||1;
+    const rect=root.getBoundingClientRect();
+    const lookup=new Map(api.getSceneElements().map(el=>[el.id,el]));
+    const editingId=state.editingTextElement?.id;
+    const active=new Set<string>();
+    for(const el of this.elements){
+      if(!lookup.has(el.id)||editingId===el.id){this.nodes.get(el.id)?.remove();this.nodes.delete(el.id);continue;}
+      const source=String(el.originalText??el.text);
+      const parts=splitMath(source);
+      if(!parts.some(p=>p.type==='math'))continue;
+      active.add(el.id);
+      let pos;
+      try{pos=sceneCoordsToViewportCoords({sceneX:el.x,sceneY:el.y},state);}
+      catch{continue;}
+      const x=pos.x-rect.left, y=pos.y-rect.top;
+      const font=Math.max(1,(Number(el.fontSize)||20)*zoom);
+      const width=Math.max(2,Number(el.width)*zoom);
+      const height=Math.max(font*1.25,Number(el.height)*zoom);
+      const color=el.strokeColor||'#1e1e1e';
+      const container=el.containerId?lookup.get(el.containerId):null;
+      const fill=container && container.backgroundColor && container.backgroundColor!=='transparent' &&
+        container.fillStyle==='solid' ? container.backgroundColor : (state.viewBackgroundColor||'#ffffff');
+      let node=this.nodes.get(el.id);
+      if(!node){node=this.doc.createElement('div');node.className='svg-fork-math-text';
+        Object.assign(node.style,{position:'absolute',pointerEvents:'none',boxSizing:'border-box',
+          margin:'0',padding:'0',left:'0',top:'0',whiteSpace:'pre-wrap',overflowWrap:'anywhere'});
+        host.appendChild(node);this.nodes.set(el.id,node);}
+      const sig=[source,font,width,height,color,fill,el.textAlign,el.fontFamily].join('|');
+      if(node.dataset.sig!==sig){
+        node.dataset.sig=sig;node.replaceChildren();
+        Object.assign(node.style,{fontSize:font+'px',fontFamily:this.font(el.fontFamily),
+          lineHeight:String(el.lineHeight||1.25),textAlign:el.textAlign||'left',
+          color,background:fill,width:width+'px',minHeight:height+'px'});
+        for(const p of parts){
+          if(p.type==='text'){node.appendChild(this.doc.createTextNode(p.value));continue;}
+          try{
+            const svg=this.formula(p.value,p.display);
+            const vb=(svg.getAttribute('viewBox')||'').trim().split(/[ ,]+/).map(Number);
+            const h=font*(p.display?1.6:1.17);
+            const w=vb.length===4 && vb[3]>0?Math.min(h*vb[2]/vb[3],10000):h;
+            svg.setAttribute('width',String(w));svg.setAttribute('height',String(h));
+            svg.style.cssText=`width:${w}px;height:${h}px;vertical-align:-0.22em;color:${color};overflow:visible;`;
+            if(p.display){const line=this.doc.createElement('div');line.style.display='block';
+              line.appendChild(svg);node.appendChild(line);}
+            else node.appendChild(svg);
+          }catch(error){console.warn('SVG fork: inline MathJax failed',error);
+            node.appendChild(this.doc.createTextNode((p.display?'$$':'$')+p.value+(p.display?'$$':'$')));}
+        }
+      }
+      const trans=`translate(${x}px,${y}px) rotate(${el.angle||0}rad)`;
+      if(node.style.transform!==trans)node.style.transform=trans;
+      node.style.transformOrigin='center center';
+    }
+    for(const [id,node] of this.nodes)if(!active.has(id)){node.remove();this.nodes.delete(id);}
+  }
+  private font(id:number){
+    return ({1:'Virgil, cursive',2:'Helvetica, Arial, sans-serif',3:'Cascadia, monospace',
+      5:'Excalifont, cursive',6:'Nunito, sans-serif',7:'Arial, sans-serif'} as any)[id]||'Arial, sans-serif';
+  }
+  private formula(latex:string,display:boolean){
+    const key=(display?'D:':'I:')+latex;
+    const cached=this.mathCache.get(key);if(cached)return cached.cloneNode(true) as SVGSVGElement;
+    const markup=texToSvg(latex,display);
+    const Parser=this.doc.defaultView?.DOMParser||DOMParser;
+    const parsed=new Parser().parseFromString(markup,'text/html');
+    const svg=parsed.querySelector('svg');
+    if(!svg)throw new Error('MathJax returned no SVG');
+    this.mathCache.set(key,svg.cloneNode(true) as SVGSVGElement);
+    if(this.mathCache.size>300)this.mathCache.delete(this.mathCache.keys().next().value);
+    return this.doc.importNode(svg,true) as SVGSVGElement;
+  }
+  clear(){
+    if(this.root){this.root.removeEventListener('wheel',this.onInteraction,true);
+      this.root.removeEventListener('pointermove',this.onInteraction,true);
+      this.root.removeEventListener('scroll',this.onInteraction,true);}
+    this.doc?.defaultView?.removeEventListener('resize',this.onInteraction);
+    this.host?.remove();this.root=null;this.host=null;this.nodes.clear();
+  }
+}

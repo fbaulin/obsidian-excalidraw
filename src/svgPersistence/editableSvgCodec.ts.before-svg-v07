@@ -1,0 +1,96 @@
+// @ts-nocheck
+/**
+ * SVG-native Excalidraw persistence adapter (proof-of-concept).
+ * SVG preview + the original Excalidraw Markdown drawing + a best-effort
+ * draw.io mxGraphModel for supported primitive elements.
+ * No DOM requirement; safe to use from browser/Electron and test under Node.
+ * Incorporation into a modified upstream plugin is subject to upstream AGPL-3.0.
+ */
+import {drawioMathText} from './mathSyntax';
+export const CODEC_ID = 'obsidian-excalidraw-svg-v1';
+const META_ID = 'obsidian-excalidraw-persistence';
+const enc = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+const u8 = s => new TextEncoder().encode(s);
+const b64 = s => { const bytes=u8(s); let binary=''; for(let i=0;i<bytes.length;i+=32768) binary+=String.fromCharCode(...bytes.subarray(i,i+32768)); return btoa(binary); };
+const unb64 = s => new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(atob(s), x=>x.charCodeAt(0)));
+const num = (x, d=0) => Number.isFinite(Number(x)) ? Number(x) : d;
+const n = x => String(Math.round(num(x)*1000)/1000);
+const style = parts => parts.filter(Boolean).join(';')+';';
+
+/** Create valid draw.io XML for editability of the mapped scene subset.
+ * Unknown/custom Excalidraw objects remain fully editable in Excalidraw
+ * because the original scene is embedded separately. */
+export function createDrawioGraph(scene={}) {
+  const elements=(scene.elements||[]).filter(el=>!el.isDeleted);
+  const cells=['<mxCell id="0"/>','<mxCell id="1" parent="0"/>'];
+  let mapped=0;
+  for (const el of elements) {
+    const id=enc(`ex-${el.id}`), x=n(el.x), y=n(el.y), w=n(Math.abs(el.width||1)), h=n(Math.abs(el.height||1));
+    const stroke=enc(el.strokeColor||'#1e1e1e'), fill=enc(el.backgroundColor&&el.backgroundColor!=='transparent'?el.backgroundColor:'none');
+    const sw=n(el.strokeWidth||1), font=n(el.fontSize||20);
+    let shape='', text='';
+    if (el.type==='rectangle') shape='rounded=0;';
+    else if (el.type==='ellipse') shape='ellipse;';
+    else if (el.type==='diamond') shape='rhombus;';
+    else if (el.type==='text') { shape='text;'; text=drawioMathText(el.originalText??el.text??''); }
+    else if (el.type==='line'||el.type==='arrow') {
+      const points=el.points||[];
+      if(points.length<2) continue;
+      const first=points[0],last=points[points.length-1];
+      const sx=n(num(el.x)+num(first[0])),sy=n(num(el.y)+num(first[1]));
+      const tx=n(num(el.x)+num(last[0])),ty=n(num(el.y)+num(last[1]));
+      const lineStyle=style(['endArrow='+(el.type==='arrow'?'block':'none'),'startArrow=none','strokeColor='+stroke,'strokeWidth='+sw]);
+      const intermediates=points.length>2?'<Array as="points">'+points.slice(1,-1).map(p=>`<mxPoint x="${n(num(el.x)+num(p[0]))}" y="${n(num(el.y)+num(p[1]))}"/>`).join('')+'</Array>':'';
+      cells.push(`<mxCell id="${id}" edge="1" parent="1" style="${enc(lineStyle)}"><mxGeometry relative="1" as="geometry"><mxPoint x="${sx}" y="${sy}" as="sourcePoint"/><mxPoint x="${tx}" y="${ty}" as="targetPoint"/>${intermediates}</mxGeometry></mxCell>`);
+      mapped++; continue;
+    } else continue;
+    const common=el.type==='text'
+      ? style([shape,'html=0','whiteSpace=wrap','strokeColor=none','fillColor=none',`fontSize=${font}`,`fontColor=${stroke}`,'align='+enc(el.textAlign||'left'),'verticalAlign=middle'])
+      : style([shape,`strokeColor=${stroke}`,`fillColor=${fill}`,`strokeWidth=${sw}`]);
+    cells.push(`<mxCell id="${id}" value="${enc(text)}" style="${enc(common)}" vertex="1" parent="1"><mxGeometry x="${x}" y="${y}" width="${w}" height="${h}" as="geometry"/></mxCell>`);
+    mapped++;
+  }
+  const model=`<mxGraphModel math="1" grid="1" page="0"><root>${cells.join('')}</root></mxGraphModel>`;
+  const mxfile=`<mxfile host="Obsidian" type="device" compressed="false"><diagram id="main" name="Page-1">${model}</diagram></mxfile>`;
+  return {mxfile,mapped,total:elements.length};
+}
+
+/** Store a preview and lossless editable state in *one* real SVG file.
+ * The content attr is draw.io's actual XML-embedding convention.
+ * The independent metadata is Excalidraw's exact legacy document state. */
+export function saveEditableSvg(svgMarkup, markdownDrawing, scene={}) {
+  if(typeof svgMarkup!=='string'||typeof markdownDrawing!=='string') throw new TypeError('SVG and source drawing must be strings');
+  const root=/<svg\b[^>]*>/i.exec(svgMarkup);
+  if(!root) throw new Error('SVG root not found');
+  if(/\bcontent\s*=/.test(root[0])) throw new Error('SVG root already contains content attribute; refusing to overwrite');
+  if(new RegExp(`<metadata\\s+id=["']${META_ID}["']`).test(svgMarkup)) throw new Error('Already encoded; use original SVG preview for resave');
+  const graph=createDrawioGraph(scene);
+  const payload={format:CODEC_ID, version:1, markdown:markdownDrawing};
+  const meta=`<metadata id="${META_ID}" data-encoding="base64-utf8" data-version="1">${b64(JSON.stringify(payload))}</metadata>`;
+  const injectedRoot=root[0].replace(/>$/,` content="${enc(graph.mxfile)}" data-excalidraw-svg="1">`);
+  return svgMarkup.slice(0,root.index)+injectedRoot+meta+svgMarkup.slice(root.index+root[0].length);
+}
+
+/** Reads only our metadata; never treats untrusted foreign SVG as a scene.
+ * Display/render sanitization is the responsibility of the existing SVG exporter/Obsidian. */
+export function loadEditableSvg(svgMarkup) {
+  if(typeof svgMarkup!=='string'||!/<svg\b/i.test(svgMarkup)) throw new Error('Not an SVG document');
+  const tag=svgMarkup.match(new RegExp(`<metadata\\b(?=[^>]*\\bid=["']${META_ID}["'])[^>]*>([\\s\\S]*?)<\\/metadata>`, 'i'));
+  if(!tag) throw new Error('SVG does not contain editable Excalidraw scene metadata');
+  const obj=JSON.parse(unb64(tag[1].trim()));
+  if(obj.format!==CODEC_ID||obj.version!==1||typeof obj.markdown!=='string') throw new Error('Unsupported SVG scene version');
+  return obj.markdown;
+}
+
+/** Detect supported drawings without decoding metadata. */
+export function isEditableExcalidrawSvg(content) {
+  return typeof content==='string' && /<svg\b/i.test(content) && content.includes(`id="${META_ID}"`);
+}
+
+/** Normalize content before feeding it to ExcalidrawData (Markdown only). */
+export function asInternalMarkdown(content, isSvg) {
+  if (!isSvg) return content;
+  if (typeof content !== 'string') throw new TypeError('Expected SVG contents');
+  if (!/<svg\b/i.test(content)) throw new Error('Expected an SVG file, not a Markdown/JSON payload');
+  return loadEditableSvg(content);
+}

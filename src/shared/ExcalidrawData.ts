@@ -2062,8 +2062,12 @@ export class ExcalidrawData {
     this.scene = newScene as ExcalidrawDataScene;
     let result = false;
     if (!this.compatibilityMode) {
-      result = await this.syncFiles();
-      this.scene.files = {}; //files contains the dataURLs of files. Once synced these are all saved to disk
+      // SVG_FORK_INLINE_SYNC_V11: persist image data inside the drawing itself.
+      // Standard Markdown Excalidraw files retain upstream attachment behavior.
+      if(this.file?.extension !== 'svg') {
+        result = await this.syncFiles();
+        this.scene.files = {};
+      }
     }
     const { linkedNonTextElementsById, textElementsById } =
       this.getSceneElementIndexes();

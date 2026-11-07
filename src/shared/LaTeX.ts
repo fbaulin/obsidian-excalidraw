@@ -4,6 +4,7 @@ import ExcalidrawView from "../view/ExcalidrawView";
 import { FileData, MimeType } from "src/types/embeddedFileLoaderTypes";
 import { FileId } from "@zsviczian/excalidraw/types/element/src/types";
 import ExcalidrawPlugin from "src/core/main";
+import {renderEquationDataURL} from "src/svgPersistence/mathjaxDataURL";
 import type { ExcalidrawExtrasAPI } from "@zsviczian/excalidraw-extras-api";
 import type { MathJaxRenderOptions } from "src/types/mathJaxTypes";
 
@@ -40,52 +41,23 @@ export const updateEquation = async (
 export async function tex2dataURL(
   tex: string,
   scale: number = 4,
-  plugin: ExcalidrawPlugin,
+  _plugin: ExcalidrawPlugin,
   options?: MathJaxRenderOptions,
 ): Promise<{
   mimeType: MimeType;
   fileId: FileId;
   dataURL: DataURL;
   created: number;
-  size: { height: number; width: number };
+  size: {height: number; width: number};
 } | null> {
-  // 1. Ask the gateway to verify the Extras plugin and return the MathJax API
-  const mathjaxAPI = await plugin.extrasGateway.getMathJax();
-
-  if (!mathjaxAPI) {
-    // The Gateway handles the user prompts. If it returns null, the user cancelled,
-    // or they don't have the plugin/proper version. We abort cleanly.
+  try {
+    return renderEquationDataURL(tex, scale) as any;
+  } catch (error) {
+    if (options?.throwOnError) throw error;
+    console.error('SVG fork MathJax rendering failed:', error);
     return null;
   }
-
-  // 2. Resolve Preamble File using cachedRead for performance
-  let preambleStr: string | null = null;
-  const preamblePath = plugin.settings.latexPreambleLocation || "preamble.sty";
-  const preambleFile = plugin.app.vault.getAbstractFileByPath(preamblePath);
-
-  if (preambleFile instanceof TFile) {
-    preambleStr = await plugin.app.vault.cachedRead(preambleFile);
-  }
-
-  // 3. Hand the request off to the cleanly isolated Extras plugin
-  // The runtime component version gate guarantees this additive signature even
-  // while the separately published API typings remain on the previous version.
-  const mathjaxAPIWithOptions: { tex2dataURL: Tex2DataURLWithOptions } =
-    mathjaxAPI;
-  return (await mathjaxAPIWithOptions.tex2dataURL(
-    tex,
-    scale,
-    preambleStr,
-    options,
-  )) as {
-    mimeType: MimeType;
-    fileId: FileId;
-    dataURL: DataURL;
-    created: number;
-    size: { height: number; width: number };
-  } | null;
 }
-
 export const clearMathJaxVariables = (plugin: ExcalidrawPlugin) => {
   // Try to access without prompting the user.
   // If the plugin is disabled, we don't need to clear variables anyway.

@@ -1,3 +1,7 @@
+import {rasterizeMathSvg} from '../../svgPersistence/mathSvgRasterize';
+import {hasMathText} from '../../svgPersistence/mathSceneHasText';
+import {overlayMathInSvg} from '../../svgPersistence/mathSvgOverlay';
+import {texToSvg} from '../../svgPersistence/mathjaxRenderer';
 import {
   getFrontMatterInfo,
   normalizePath,
@@ -426,7 +430,7 @@ export class ViewExportManager {
     const exportTheme = this.getViewExportTheme(theme) as "dark" | "light";
     const overrideFiles = await this.loadFilesForExport(exportTheme);
 
-    return await this.dependencies.getSVG(
+    const svgWithMath = await this.dependencies.getSVG(
       {
         ...scene,
         ...{
@@ -442,6 +446,12 @@ export class ViewExportManager {
       this.view.file,
       overrideFiles ?? undefined,
     );
+    // SVG_FORK_MATH_COPY_V111: all exports, including selection-only and clipboard SVG.
+    if(this.view.file?.extension === 'svg' && svgWithMath) {
+      const result=overlayMathInSvg(svgWithMath,scene,texToSvg);
+      if(result.skipped)console.warn('SVG fork: skipped LaTeX during export',result.skipped);
+    }
+    return svgWithMath;
   }
 
   /** Saves SVG autoexports for the supplied or current scene. */
@@ -601,6 +611,11 @@ export class ViewExportManager {
     theme?: string,
     embedScene?: boolean,
   ): Promise<Blob> {
+    // SVG_FORK_MATH_PNG_V111: rasterize the fully typeset SVG, never raw TeX.
+    if(this.view.file?.extension === 'svg' && hasMathText(scene)) {
+      const rendered=await this.svg(scene,theme,embedScene,true);
+      return rasterizeMathSvg(rendered,this.getViewExportScale());
+    }
     const exportSettings: ExportSettings = {
       withBackground: !!this.getViewExportWithBackground(),
       withTheme: true,
