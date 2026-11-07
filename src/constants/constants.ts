@@ -3,7 +3,8 @@ import { ExcalidrawLib } from "../types/excalidrawLib";
 import type ExcalidrawPlugin from "src/core/main";
 import { DeviceType } from "src/types/types";
 import { errorHandler } from "../utils/ErrorHandler";
-import { getLanguage } from "obsidian";
+import * as Obsidian from "obsidian";
+import { getHostLanguage } from "../compatibility/host";
 import { URLs } from "./safeUrls";
 import { setStyle } from "src/utils/styleUtils";
 //This is only for backward compatibility because an early version of obsidian included an encoding to avoid fantom links from littering Obsidian graph view
@@ -38,7 +39,7 @@ export const ERROR_IFRAME_CONVERSION_CANCELED = "iframe conversion canceled";
 
 declare const excalidrawLib: typeof ExcalidrawLib;
 
-export const LOCALE = getLanguage().toLowerCase();
+export const LOCALE = getHostLanguage(Obsidian, () => window.localStorage.getItem("language")).toLowerCase();
 export const CJK_FONTS = "CJK Fonts";
 
 export const obsidianToExcalidrawMap: { [key: string]: string } = {

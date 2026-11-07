@@ -330,7 +330,9 @@ const BUILD_CONFIG = {
   },
   plugins: getRollupPlugins(
     {
-      tsconfig: isProd ? "tsconfig.json" : "tsconfig.dev.json",
+      // Check the shipped runtime graph, not orphan master files or copied API docs.
+      // Keep the broad upstream tsconfig for full-repository diagnostics.
+      tsconfig: isProd ? "tsconfig.runtime.json" : "tsconfig.dev.json",
       sourceMap: !isProd,
     },
     ...(isProd ? [

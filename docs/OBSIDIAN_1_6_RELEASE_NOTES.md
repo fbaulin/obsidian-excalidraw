@@ -1,0 +1,48 @@
+# SVG v1.1.1 / Obsidian 1.6.5 compatibility candidate 1
+
+**Experimental, not verified inside an Obsidian 1.6.5 renderer.** The manifest
+minimum permits testing; it is not a runtime certification. See
+`OBSIDIAN_1_6_COMPATIBILITY.md` for the outstanding acceptance matrix.
+
+## Changes
+
+- Avoid module-load failure when the host lacks `getLanguage()` (introduced 1.8.7).
+  Prefer the native language API when present; otherwise read the legacy language
+  storage key, defaulting to English if storage is unavailable.
+- Check undocumented `app.saveAttachment()` before using it. On older hosts,
+  retain the existing attachment-folder, path hook, unique-name and vault writer
+  implementation instead. Do not change attachment preferences.
+- Skip `loadIfDeferred()` on eager-loading hosts older than 1.7.2.
+- Fall back from `Notice.messageEl` to legacy `noticeEl` for mask-file and
+  slow-font notification listeners.
+- Centralize optional native CLI detection. Keep its desktop/version/method guard;
+  do not register it on 1.6.5. Legacy settings rendering remains available.
+- Type the arrow geometry input to remove an inherited implicit-any diagnostic.
+- Add behavioral host, persistence, resize, arrow-label and real MathJax tests.
+- Add a relative-path WSL build script that works directly from this source,
+  uses the dependency lock and does not apply historical patches or deploy to a vault.
+- Both source manifests declare candidate version `2.29.0-svg.11.1-compat.1`
+  and minimum app `1.6.5`; Rollup copies the production manifest and embeds the
+  beta manifest version, so both must agree.
+
+## Preserved
+
+No drawing engine downgrade, codec migration, plugin ID change, drawing metadata
+change, setting reset or original 2.18 installation modification. The complete
+SVG v1.1.1 source stays in Git, including inline image persistence, local MathJax,
+SVG/PNG export hooks, fixed-font resizing and ordinary SVG single-image import.
+Preservation of source is not a claim of GUI regression testing.
+
+## Risks and unsupported workflows
+
+- Dual-plugin coexistence with 2.18 under the same ID is not supported.
+- Native CLI and declarative settings require their original newer host APIs.
+- Mobile is not part of this compatibility certification.
+- Private canvas/workspace APIs, old installer Chromium, host CodeMirror,
+  clipboard, popouts, autosave interruption and arrow overlays need GUI testing.
+- Installed executable appears to be Electron 24.3.1 / Chromium 112, older than
+  the optional Electron 30.1.2 installer for Obsidian 1.6.5. Capture live runtime
+  versions before interpreting failures.
+- The supplied snapshot has unrelated TypeScript diagnostics in orphan newer
+  feature files and declaration files. Full `tsc` is not clean. They are recorded
+  rather than suppressed. Production Rollup succeeds despite those diagnostics.

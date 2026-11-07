@@ -1,0 +1,134 @@
+$ npx eslint src/compatibility/host.ts
+EXIT=0
+$ npm run test:compat
+
+> obsidian-excalidraw-plugin@2.2.5 test:compat
+> node --test scripts/testing/compatibility.test.mjs
+
+TAP version 13
+# Subtest: notices prefer modern message element and fall back to legacy container
+ok 1 - notices prefer modern message element and fall back to legacy container
+  ---
+  duration_ms: 1.977944
+  type: 'test'
+  ...
+# Subtest: native CLI requires desktop, correct API semantics and method presence
+ok 2 - native CLI requires desktop, correct API semantics and method presence
+  ---
+  duration_ms: 0.355388
+  type: 'test'
+  ...
+# Subtest: legacy host initializes language without invoking unavailable APIs
+ok 3 - legacy host initializes language without invoking unavailable APIs
+  ---
+  duration_ms: 0.416995
+  type: 'test'
+  ...
+# Subtest: modern language takes precedence and does not read legacy storage
+ok 4 - modern language takes precedence and does not read legacy storage
+  ---
+  duration_ms: 0.161046
+  type: 'test'
+  ...
+# Subtest: attachment fallback is selected only when native saving is absent
+ok 5 - attachment fallback is selected only when native saving is absent
+  ---
+  duration_ms: 0.201321
+  type: 'test'
+  ...
+# Subtest: eager legacy and deferred modern views both load safely
+ok 6 - eager legacy and deferred modern views both load safely
+  ---
+  duration_ms: 0.470401
+  type: 'test'
+  ...
+# Subtest: ordinary SVG import creates exactly one image and embeds original artwork
+ok 7 - ordinary SVG import creates exactly one image and embeds original artwork
+  ---
+  duration_ms: 14.961173
+  type: 'test'
+  ...
+# Subtest: repeated SVG round trips retain Unicode, formulas, scene and embedded image bytes
+ok 8 - repeated SVG round trips retain Unicode, formulas, scene and embedded image bytes
+  ---
+  duration_ms: 1.375892
+  type: 'test'
+  ...
+# Subtest: invalid or foreign scene metadata fails closed
+ok 9 - invalid or foreign scene metadata fails closed
+  ---
+  duration_ms: 0.383226
+  type: 'test'
+  ...
+# Subtest: text resizing preserves font and independently changes height or width
+ok 10 - text resizing preserves font and independently changes height or width
+  ---
+  duration_ms: 17.858384
+  type: 'test'
+  ...
+# Subtest: arrow label tracks changed endpoints without moving its editable source
+ok 11 - arrow label tracks changed endpoints without moving its editable source
+  ---
+  duration_ms: 0.611707
+  type: 'test'
+  ...
+# Subtest: real bundled MathJax renders inline, display and aligned equations as vectors
+ok 12 - real bundled MathJax renders inline, display and aligned equations as vectors
+  ---
+  duration_ms: 202.859859
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 836.742976
+EXIT=0
+$ npx tsc --noEmit -p tsconfig.runtime.json
+node_modules/@excalidraw/mermaid-to-excalidraw/dist/interfaces.d.ts(1,48): error TS2307: Cannot find module '@excalidraw/excalidraw/element/transform' or its corresponding type declarations.
+node_modules/@zsviczian/excalidraw/types/excalidraw/i18n.d.ts(2,30): error TS2307: Cannot find module './locales/en.json' or its corresponding type declarations.
+node_modules/jotai-scope/dist/src/ScopeProvider/ScopeProvider.d.ts(2,45): error TS2307: Cannot find module './types' or its corresponding type declarations.
+node_modules/jotai-scope/dist/src/ScopeProvider/ScopeProvider.d.ts(7,6): error TS2503: Cannot find namespace 'JSX'.
+node_modules/jotai-scope/dist/src/ScopeProvider/ScopeProvider.d.ts(12,6): error TS2503: Cannot find namespace 'JSX'.
+node_modules/obsidian/obsidian.d.ts(605,14): error TS2420: Class 'CapacitorAdapter' incorrectly implements interface 'DataAdapter'.
+  Type 'CapacitorAdapter' is missing the following properties from type 'DataAdapter': url, basePath, fs
+node_modules/obsidian/obsidian.d.ts(1629,14): error TS2420: Class 'FileSystemAdapter' incorrectly implements interface 'DataAdapter'.
+  Type 'FileSystemAdapter' is missing the following properties from type 'DataAdapter': url, basePath, fs
+node_modules/obsidian/obsidian.d.ts(2334,14): error TS2420: Class 'MarkdownEditView' incorrectly implements interface 'MarkdownSubView'.
+  Type 'MarkdownEditView' is missing the following properties from type 'MarkdownSubView': applyFoldInfo, getFoldInfo
+node_modules/obsidian/obsidian.d.ts(2483,14): error TS2420: Class 'MarkdownPreviewView' incorrectly implements interface 'MarkdownSubView'.
+  Type 'MarkdownPreviewView' is missing the following properties from type 'MarkdownSubView': applyFoldInfo, getFoldInfo
+EXIT=2
+$ npx tsc --noEmit -p tsconfig.runtime.json (historical declarations)
+node_modules/@excalidraw/mermaid-to-excalidraw/dist/interfaces.d.ts(1,48): error TS2307: Cannot find module '@excalidraw/excalidraw/element/transform' or its corresponding type declarations.
+node_modules/@zsviczian/excalidraw/types/excalidraw/i18n.d.ts(2,30): error TS2307: Cannot find module './locales/en.json' or its corresponding type declarations.
+node_modules/jotai-scope/dist/src/ScopeProvider/ScopeProvider.d.ts(2,45): error TS2307: Cannot find module './types' or its corresponding type declarations.
+node_modules/jotai-scope/dist/src/ScopeProvider/ScopeProvider.d.ts(7,6): error TS2503: Cannot find namespace 'JSX'.
+node_modules/jotai-scope/dist/src/ScopeProvider/ScopeProvider.d.ts(12,6): error TS2503: Cannot find namespace 'JSX'.
+node_modules/obsidian/obsidian.d.ts(1489,14): error TS2420: Class 'FileSystemAdapter' incorrectly implements interface 'DataAdapter'.
+  Type 'FileSystemAdapter' is missing the following properties from type 'DataAdapter': url, basePath, fs
+node_modules/obsidian/obsidian.d.ts(2154,14): error TS2420: Class 'MarkdownEditView' incorrectly implements interface 'MarkdownSubView'.
+  Type 'MarkdownEditView' is missing the following properties from type 'MarkdownSubView': applyFoldInfo, getFoldInfo
+node_modules/obsidian/obsidian.d.ts(2300,14): error TS2420: Class 'MarkdownPreviewView' incorrectly implements interface 'MarkdownSubView'.
+  Type 'MarkdownPreviewView' is missing the following properties from type 'MarkdownSubView': applyFoldInfo, getFoldInfo
+EXIT=2
+
+> obsidian-excalidraw-plugin@2.2.5 build
+> cross-env NODE_ENV=production rollup --config rollup.config.mjs
+
+Running: production; isProd: true; isLib: false
+2.29.0-svg.11.1-compat.1
+[36m
+[1msrc/core/main.ts[22m → [1mdist[22m...[39m
+[1m[33m(!) Circular dependencies[39m[22m
+node_modules/mathjax-full/js/input/tex/TexParser.js -> node_modules/mathjax-full/js/input/tex/ParseUtil.js -> node_modules/mathjax-full/js/input/tex/TexParser.js
+node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsMethods.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsUtil.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsMethods.js
+node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsConfiguration.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsMappings.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsMethods.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsUtil.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsConfiguration.js
+...and 17 more
+[32mcreated [1mdist[22m in [1m30.4s[22m[39m
+BUILD_EXIT=0
+PUBLISHED_FINAL_BUILD

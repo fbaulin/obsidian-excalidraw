@@ -1,4 +1,5 @@
 import { DataURL } from "@zsviczian/excalidraw/types/excalidraw/types";
+import { supportsAttachmentSave } from "../compatibility/host";
 import {
   App,
   loadPdfJs,
@@ -792,6 +793,7 @@ export function canSaveAsObsidianAttachment(
   view?: ExcalidrawView,
 ): boolean {
   return (
+    supportsAttachmentSave(app) &&
     !view?.getHookServer()?.onImageFilePathHook &&
     app.workspace.getActiveFile()?.path === excalidrawFile.path
   );

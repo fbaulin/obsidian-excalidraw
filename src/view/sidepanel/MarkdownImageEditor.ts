@@ -1,3 +1,4 @@
+import { loadLeafIfDeferred } from "../../compatibility/host";
 import {
   addIcon,
   ButtonComponent,
@@ -1681,7 +1682,7 @@ class MarkdownImageEditorController {
           },
           { history: false },
         );
-        await leaf.loadIfDeferred();
+        await loadLeafIfDeferred(leaf);
       } else {
         await leaf.openFile(sourceFile, {
           active: false,

@@ -1,6 +1,7 @@
 import {CanvasMathOverlay} from '../svgPersistence/canvasMathOverlay';
 import {LiveTextResize} from '../svgPersistence/liveTextResize';
 import {FixedTextLayout} from '../svgPersistence/fixedTextLayout';
+import { getNoticeElement } from "../compatibility/host";
 import {
   Editor,
   TextFileView,
@@ -3096,12 +3097,12 @@ export default class ExcalidrawView
         const notice = new Notice(t("MASK_FILE_NOTICE"), 5000);
         //add click and hold event listner to the notice
         let noticeTimeout: number;
-        this.registerDomEvent(notice.messageEl, "pointerdown", () => {
+        this.registerDomEvent(getNoticeElement(notice), "pointerdown", () => {
           noticeTimeout = window.setTimeout(() => {
             window.open(getYouTubeUrl("uHFd0XoHRxE"));
           }, 1000);
         });
-        this.registerDomEvent(notice.messageEl, "pointerup", () => {
+        this.registerDomEvent(getNoticeElement(notice), "pointerup", () => {
           window.clearTimeout(noticeTimeout);
         });
       }

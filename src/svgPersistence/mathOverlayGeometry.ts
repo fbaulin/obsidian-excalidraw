@@ -1,5 +1,14 @@
 /** Screen-independent geometry for SVG-fork's formula labels. */
-export function arrowLabelCenter(arrow: any): {x:number,y:number}|null {
+interface ArrowGeometry {
+  type: string;
+  points?: readonly (readonly number[])[];
+  angle?: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}
+export function arrowLabelCenter(arrow: ArrowGeometry): {x:number,y:number}|null {
   if (!arrow || !['arrow','line'].includes(arrow.type) || !Array.isArray(arrow.points) || arrow.points.length < 2) return null;
   const points = arrow.points.map((p: unknown) => {
     if(!Array.isArray(p) || p.length<2 || !Number.isFinite(p[0]) || !Number.isFinite(p[1]))return null;

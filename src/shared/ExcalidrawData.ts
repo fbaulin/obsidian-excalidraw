@@ -6,6 +6,7 @@
     rawText: text with original markdown markup and without the added linebreaks for wrapping
  */
 import { App, Notice, TFile } from "obsidian";
+import { getNoticeElement } from "../compatibility/host";
 import {
   nanoid,
   fileid,
@@ -860,7 +861,7 @@ export class ExcalidrawData {
         return;
       }
       const notice = new Notice(t("FONT_LOAD_SLOW"), 15000);
-      notice.messageEl.oncontextmenu = () => {
+      getNoticeElement(notice).oncontextmenu = () => {
         displayFontMessage(this.app);
       };
     }, 5000);

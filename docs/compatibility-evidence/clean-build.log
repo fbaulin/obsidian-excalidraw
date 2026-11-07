@@ -1,0 +1,315 @@
+npm warn deprecated sliced@1.0.1: Unsupported
+npm warn deprecated sourcemap-codec@1.4.8: Please use @jridgewell/sourcemap-codec instead
+npm warn deprecated mathjax-full@3.2.2: Version 4 replaces this package with the scoped package @mathjax/src
+
+added 840 packages in 17s
+
+> obsidian-excalidraw-plugin@2.2.5 test:compat
+> node --test scripts/testing/compatibility.test.mjs
+
+TAP version 13
+# Subtest: notices prefer modern message element and fall back to legacy container
+ok 1 - notices prefer modern message element and fall back to legacy container
+  ---
+  duration_ms: 1.501526
+  type: 'test'
+  ...
+# Subtest: native CLI requires desktop, correct API semantics and method presence
+ok 2 - native CLI requires desktop, correct API semantics and method presence
+  ---
+  duration_ms: 0.357658
+  type: 'test'
+  ...
+# Subtest: legacy host initializes language without invoking unavailable APIs
+ok 3 - legacy host initializes language without invoking unavailable APIs
+  ---
+  duration_ms: 0.192709
+  type: 'test'
+  ...
+# Subtest: modern language takes precedence and does not read legacy storage
+ok 4 - modern language takes precedence and does not read legacy storage
+  ---
+  duration_ms: 0.145906
+  type: 'test'
+  ...
+# Subtest: attachment fallback is selected only when native saving is absent
+ok 5 - attachment fallback is selected only when native saving is absent
+  ---
+  duration_ms: 0.321312
+  type: 'test'
+  ...
+# Subtest: eager legacy and deferred modern views both load safely
+ok 6 - eager legacy and deferred modern views both load safely
+  ---
+  duration_ms: 0.772616
+  type: 'test'
+  ...
+# Subtest: repeated SVG round trips retain Unicode, formulas, scene and embedded image bytes
+ok 7 - repeated SVG round trips retain Unicode, formulas, scene and embedded image bytes
+  ---
+  duration_ms: 2.381513
+  type: 'test'
+  ...
+# Subtest: invalid or foreign scene metadata fails closed
+ok 8 - invalid or foreign scene metadata fails closed
+  ---
+  duration_ms: 0.28574
+  type: 'test'
+  ...
+# Subtest: text resizing preserves font and independently changes height or width
+ok 9 - text resizing preserves font and independently changes height or width
+  ---
+  duration_ms: 16.778497
+  type: 'test'
+  ...
+# Subtest: arrow label tracks changed endpoints without moving its editable source
+ok 10 - arrow label tracks changed endpoints without moving its editable source
+  ---
+  duration_ms: 0.583654
+  type: 'test'
+  ...
+# Subtest: real bundled MathJax renders inline, display and aligned equations as vectors
+ok 11 - real bundled MathJax renders inline, display and aligned equations as vectors
+  ---
+  duration_ms: 241.767773
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 994.407445
+
+> obsidian-excalidraw-plugin@2.2.5 test:obsidian:runner
+> node --test scripts/testing/host/runner.test.mjs scripts/testing/host/processTools.test.mjs
+
+TAP version 13
+# Subtest: CLI discovery supports both desktop platforms, overrides and PATH fallback
+ok 1 - CLI discovery supports both desktop platforms, overrides and PATH fallback
+  ---
+  duration_ms: 2.07711
+  type: 'test'
+  ...
+# Subtest: long and multiline Windows evals preserve literal code and remove their temporary scripts
+ok 2 - long and multiline Windows evals preserve literal code and remove their temporary scripts
+  ---
+  duration_ms: 8.108215
+  type: 'test'
+  ...
+# Subtest: temporary eval scripts are removed if native spawning throws
+ok 3 - temporary eval scripts are removed if native spawning throws
+  ---
+  duration_ms: 1.873114
+  type: 'test'
+  ...
+# Subtest: short Windows calls and all macOS calls keep their native arguments
+ok 4 - short Windows calls and all macOS calls keep their native arguments
+  ---
+  duration_ms: 0.269257
+  type: 'test'
+  ...
+# Subtest: package managers launch JavaScript entries through the current Node without .cmd shims
+ok 5 - package managers launch JavaScript entries through the current Node without .cmd shims
+  ---
+  duration_ms: 0.50606
+  type: 'test'
+  ...
+# Subtest: requires the named test vault and refuses redirected plugin paths
+ok 6 - requires the named test vault and refuses redirected plugin paths
+  ---
+  duration_ms: 6.388981
+  type: 'test'
+  ...
+# Subtest: a CLI vault mismatch stops before build or staging
+ok 7 - a CLI vault mismatch stops before build or staging
+  ---
+  duration_ms: 9.37549
+  type: 'test'
+  ...
+# Subtest: requires the initial Community plugin install and enablement
+ok 8 - requires the initial Community plugin install and enablement
+  ---
+  duration_ms: 4.73914
+  type: 'test'
+  ...
+# Subtest: a CLI config mismatch stops before build or deployment
+ok 9 - a CLI config mismatch stops before build or deployment
+  ---
+  duration_ms: 6.74377
+  type: 'test'
+  ...
+# Subtest: stages exact artifacts, asserts an editor and cleans its test drawing
+ok 10 - stages exact artifacts, asserts an editor and cleans its test drawing
+  ---
+  duration_ms: 8.221675
+  type: 'test'
+  ...
+# Subtest: an eval Error payload fails even when the CLI process reports success
+ok 11 - an eval Error payload fails even when the CLI process reports success
+  ---
+  duration_ms: 3.722616
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 130.480597
+
+> obsidian-excalidraw-plugin@2.2.5 test:markdown-embeds
+> node --test scripts/testing/markdownEmbeds.test.mjs
+
+TAP version 13
+# Subtest: ready follows successful insertion; repeated callbacks preserve the image
+ok 1 - ready follows successful insertion; repeated callbacks preserve the image
+  ---
+  duration_ms: 232.769706
+  type: 'test'
+  ...
+# Subtest: a live, detached context recovers on reattachment (before queue start)
+ok 2 - a live, detached context recovers on reattachment (before queue start)
+  ---
+  duration_ms: 96.650062
+  type: 'test'
+  ...
+# Subtest: a live, detached context recovers on reattachment (during image generation)
+ok 3 - a live, detached context recovers on reattachment (during image generation)
+  ---
+  duration_ms: 77.868487
+  type: 'test'
+  ...
+# Subtest: null releases pending state and allows a later callback to retry
+ok 4 - null releases pending state and allows a later callback to retry
+  ---
+  duration_ms: 57.403307
+  type: 'test'
+  ...
+# Subtest: throw releases pending state and allows a later callback to retry
+ok 5 - throw releases pending state and allows a later callback to retry
+  ---
+  duration_ms: 54.437257
+  type: 'test'
+  ...
+# Subtest: an obsolete completion cannot insert or clear a newer pending attempt
+ok 6 - an obsolete completion cannot insert or clear a newer pending attempt
+  ---
+  duration_ms: 47.86226
+  type: 'test'
+  ...
+# Subtest: attribute refresh retains the current image and the actual target until replacement
+ok 7 - attribute refresh retains the current image and the actual target until replacement
+  ---
+  duration_ms: 48.711843
+  type: 'test'
+  ...
+# Subtest: a later callback repairs content removed by the host
+ok 8 - a later callback repairs content removed by the host
+  ---
+  duration_ms: 50.917962
+  type: 'test'
+  ...
+# Subtest: an unloaded context cannot overwrite a replacement context's image
+ok 9 - an unloaded context cannot overwrite a replacement context's image
+  ---
+  duration_ms: 48.417112
+  type: 'test'
+  ...
+# Subtest: plugin unload cancels an in-flight image
+ok 10 - plugin unload cancels an in-flight image
+  ---
+  duration_ms: 51.842084
+  type: 'test'
+  ...
+# Subtest: permanent unload stops queued work and cleans observers/timers
+ok 11 - permanent unload stops queued work and cleans observers/timers
+  ---
+  duration_ms: 41.249727
+  type: 'test'
+  ...
+# Subtest: permanent unload stops generating work and cleans observers/timers
+ok 12 - permanent unload stops generating work and cleans observers/timers
+  ---
+  duration_ms: 50.27737
+  type: 'test'
+  ...
+# Subtest: permanent unload stops debounced work and cleans observers/timers
+ok 13 - permanent unload stops debounced work and cleans observers/timers
+  ---
+  duration_ms: 45.148107
+  type: 'test'
+  ...
+# Subtest: ordinary image embeds, text references and code blocks remain native
+ok 14 - ordinary image embeds, text references and code blocks remain native
+  ---
+  duration_ms: 138.417414
+  type: 'test'
+  ...
+# Subtest: Reading mode skips a detached candidate without suppressing a later live drawing
+ok 15 - Reading mode skips a detached candidate without suppressing a later live drawing
+  ---
+  duration_ms: 39.754879
+  type: 'test'
+  ...
+# Subtest: image loader cancellation follows context lifetime and always clears its interval
+ok 16 - image loader cancellation follows context lifetime and always clears its interval
+  ---
+  duration_ms: 80.498829
+  type: 'test'
+  ...
+# Subtest: explicit self-images override Markdown preferences and use the containing drawing
+ok 17 - explicit self-images override Markdown preferences and use the containing drawing
+  ---
+  duration_ms: 78.682654
+  type: 'test'
+  ...
+# Subtest: Reading mode resolves explicit self-images, but ignores empty and ordinary text fragments
+ok 18 - Reading mode resolves explicit self-images, but ignores empty and ordinary text fragments
+  ---
+  duration_ms: 248.180167
+  type: 'test'
+  ...
+# Subtest: Reading mode preserves a target's Markdown side unless the link explicitly requests an image
+ok 19 - Reading mode preserves a target's Markdown side unless the link explicitly requests an image
+  ---
+  duration_ms: 168.057838
+  type: 'test'
+  ...
+# Subtest: nested Markdown-side drawings and PNGs remain visible; drawing metadata stays hidden
+ok 20 - nested Markdown-side drawings and PNGs remain visible; drawing metadata stays hidden
+  ---
+  duration_ms: 440.325317
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2551.53362
+
+> obsidian-excalidraw-plugin@2.2.5 build
+> cross-env NODE_ENV=production rollup --config rollup.config.mjs
+
+Running: production; isProd: true; isLib: false
+2.29.0-svg.11.1-compat.1
+[36m
+[1msrc/core/main.ts[22m → [1mdist[22m...[39m
+[1m[33m(!) Circular dependencies[39m[22m
+node_modules/mathjax-full/js/input/tex/TexParser.js -> node_modules/mathjax-full/js/input/tex/ParseUtil.js -> node_modules/mathjax-full/js/input/tex/TexParser.js
+node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsMethods.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsUtil.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsMethods.js
+node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsConfiguration.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsMappings.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsMethods.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsUtil.js -> node_modules/mathjax-full/js/input/tex/mathtools/MathtoolsConfiguration.js
+...and 17 more
+[32mcreated [1mdist[22m in [1m29.6s[22m[39m
+PASS: compatibility build published to /mnt/d/projects/Excalidraw-svg-fork/obsidian-excalidraw-plugin-master/dist
+Build workspace retained: /tmp/excalidraw-compat-M6nKu8hZ

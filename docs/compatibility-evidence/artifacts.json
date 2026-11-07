@@ -1,0 +1,14 @@
+{
+  "main.js": {
+    "size": 6951308,
+    "sha256": "1b4fafb2125b534ce6ff898775aa45f815bf52ed27fd734f9c0f3f08ebd87b0b"
+  },
+  "styles.css": {
+    "size": 353360,
+    "sha256": "173e9c161a01c53b3c173344e023de4d327fd0658e476961b46b0e6a93117ded"
+  },
+  "manifest.json": {
+    "size": 488,
+    "sha256": "e6fc919c81f08cfaaedf345239d4623755d032f2fac1c000702e5ec77bde6627"
+  }
+}

@@ -1,5 +1,6 @@
 /** Plugin-owned native CLI registration, JSON dispatcher and bounded session receipts. */
 import { Platform, requireApiVersion } from "obsidian";
+import { supportsNativeCli } from "../../compatibility/host";
 import type ExcalidrawPlugin from "src/core/main";
 import type { CLICommand, ExcalidrawCLIRequest, ExcalidrawCLIResult } from "src/types/excalidrawCliTypes";
 import type { CliData, ObsidianCliRuntime } from "src/types/obsidianCli";
@@ -28,7 +29,7 @@ export class ExcalidrawCLI {
   /** Skips both older APIs and runtimes without the optional registration method. */
   public initialize(): void {
     const runtime = this.plugin as ExcalidrawPlugin & Partial<ObsidianCliRuntime>;
-    if (!Platform.isDesktop || !requireApiVersion("1.12.2") || typeof runtime.registerCliHandler !== "function") return;
+    if (!supportsNativeCli(runtime, Platform.isDesktop, requireApiVersion)) return;
     runtime.registerCliHandler(this.plugin.manifest.id, t("CLI_DESCRIPTION"), commandFlags("help"), params => this.native("help", params));
     for (const action of Object.keys(CLI_COMMANDS) as CLICommand[]) {
       runtime.registerCliHandler(`${this.plugin.manifest.id}:${action}`, `${t("CLI_DESCRIPTION")} — ${action}`, commandFlags(action), params => this.native(action, params));
@@ -161,7 +162,7 @@ export class ExcalidrawCLI {
       if (request.format !== undefined && !["json", "markdown"].includes(string(request.format, "format"))) throw new CLIError("INVALID_INPUT", "Expected json or markdown.", "format");
       return { markdown: CLI_SKILL };
     }
-    if (command === "status") return { apiVersion: 1, nativeCLI: Platform.isDesktop && requireApiVersion("1.12.2") && typeof (plugin as ExcalidrawPlugin & Partial<ObsidianCliRuntime>).registerCliHandler === "function", ready: plugin.isReady, vault: plugin.app.vault.getName(), version: plugin.manifest.version, converter: plugin.isReady && typeof plugin.getCLIRuntime().convertToExcalidrawElements === "function", receiptTTLSeconds: 900, receiptCapacity: 128 };
+    if (command === "status") return { apiVersion: 1, nativeCLI: supportsNativeCli(plugin, Platform.isDesktop, requireApiVersion), ready: plugin.isReady, vault: plugin.app.vault.getName(), version: plugin.manifest.version, converter: plugin.isReady && typeof plugin.getCLIRuntime().convertToExcalidrawElements === "function", receiptTTLSeconds: 900, receiptCapacity: 128 };
     if (command === "schema") {
       const action = string(request.action, "action");
       if (!Object.hasOwn(CLI_COMMANDS, action)) throw new CLIError("UNSUPPORTED_COMMAND", "Unknown action.", "action");
