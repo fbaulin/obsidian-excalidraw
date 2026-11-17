@@ -26,6 +26,65 @@ function load(relative) {
 }
 
 const host = load("src/compatibility/host");
+test("background autoexports typeset SVG and rasterize math PNG without a live view", async () => {
+  const { DOMParser, XMLSerializer } = nativeRequire("@xmldom/xmldom");
+  const previousParser = globalThis.DOMParser;
+  globalThis.DOMParser = DOMParser;
+  try {
+    const source = fs.readFileSync(path.join(root, "src/core/managers/AutoexportCoordinator.ts"), "utf8");
+    const compiled = ts.transpileModule(source, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    });
+    let text = "xx $Y^2$", nativePng = 0, rasterized = 0;
+    const require = name => {
+      if (name.endsWith("mathSvgRasterize")) return { rasterizeMathSvg: async (svg, scale) => {
+        assert.equal(scale, 2);
+        assert.ok(svg.getElementsByTagName("path").length > 0);
+        assert.doesNotMatch(Array.from(svg.getElementsByTagName("text"), el => el.textContent).join(""), /\$/);
+        rasterized++;
+        return new Blob(["rendered"], { type: "image/png" });
+      } };
+      if (name.startsWith("../../svgPersistence/")) return load("src/svgPersistence/" + name.split("/").at(-1));
+      if (name.endsWith("saveSnapshot")) return { cloneSceneForSave: structuredClone };
+      if (name === "../../utils/utils") return {
+        getSVG: async (scene, settings, padding, file, files) => {
+          assert.equal(scene.appState.theme, "dark");
+          assert.equal(settings.withBackground, false);
+          assert.equal(settings.skipInliningFonts, false);
+          assert.equal(padding, 12);
+          assert.equal(file.path, "drawing.md");
+          assert.equal(files.image, "embedded");
+          const svg = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg"><text x="0" y="20" font-size="20px">${text}</text></svg>`, "image/svg+xml").documentElement;
+          Object.defineProperty(svg, "outerHTML", { get: () => new XMLSerializer().serializeToString(svg) });
+          return svg;
+        },
+        getPNG: async () => { nativePng++; return new Blob(["native"]); },
+      };
+      return {};
+    };
+    const module = { exports: {} };
+    new Function("require", "module", "exports", compiled.outputText)(require, module, module.exports);
+    const coordinator = Object.create(module.exports.AutoexportCoordinator.prototype);
+    const scene = { elements: [{ type: "text", text, originalText: "" }], appState: { theme: "light" } };
+    const before = structuredClone(scene);
+    const request = { exportOptions: { padding: 12, scale: 2, withBackground: false, embedScene: false } };
+    const context = { scene, overrideFiles: { image: "embedded" } };
+    const args = [request, { path: "drawing.md" }, "dark", context];
+    const svg = await coordinator.renderSVG(...args);
+    assert.match(svg, /<path/);
+    assert.doesNotMatch(svg, /<text[^>]*>[^<]*\$/);
+    assert.equal((await coordinator.renderPNG(...args)).type, "image/png");
+    assert.equal(rasterized, 1);
+    assert.equal(nativePng, 0);
+    text = "ordinary text";
+    await coordinator.renderPNG(...args);
+    assert.equal(nativePng, 1);
+    assert.deepEqual(scene, before);
+  } finally {
+    if (previousParser === undefined) delete globalThis.DOMParser;
+    else globalThis.DOMParser = previousParser;
+  }
+});
 test("exported standalone and centered shape-label SVG text becomes real vector math", () => {
   const { DOMParser, XMLSerializer } = nativeRequire("@xmldom/xmldom");
   const parseXml = source => new DOMParser().parseFromString(source, "image/svg+xml");

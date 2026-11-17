@@ -15,6 +15,9 @@ import { errorlog } from "../../utils/coreUtils";
 import { createOrOverwriteFile } from "../../utils/fileUtils";
 import { sceneRemoveInternalLinks } from "../../utils/excalidrawViewUtils";
 import { getPNG, getSVG } from "../../utils/utils";
+import { overlayMathInSvg } from "../../svgPersistence/mathSvgOverlay";
+import { texToSvg } from "../../svgPersistence/mathjaxRenderer";
+import { rasterizeMathSvg } from "../../svgPersistence/mathSvgRasterize";
 import {
   cloneSceneForSave,
   type PreparedSaveExportData,
@@ -275,7 +278,7 @@ export class AutoexportCoordinator {
           content =
             output.format === "svg"
               ? await this.renderSVG(request, sourceFile, theme, context)
-              : await this.renderPNG(request, theme, context);
+              : await this.renderPNG(request, sourceFile, theme, context);
         }
         await this.writeIfCurrent(request, guard, output, content);
       } catch (error: unknown) {
@@ -370,6 +373,17 @@ export class AutoexportCoordinator {
     theme: "light" | "dark",
     context: ThemeExportContext,
   ): Promise<string> {
+    const { svg } = await this.renderMathSVG(request, sourceFile, theme, context);
+    return svg.outerHTML;
+  }
+
+  /** Render from the captured save, without depending on an open drawing view. */
+  private async renderMathSVG(
+    request: PreparedAutoexportRenderRequest,
+    sourceFile: TFile,
+    theme: "light" | "dark",
+    context: ThemeExportContext,
+  ) {
     const scene = this.createRenderScene(request, theme, context.scene);
     const settings = this.getExportSettings(request, true);
     const svg = await getSVG(
@@ -382,14 +396,23 @@ export class AutoexportCoordinator {
     if (!svg) {
       throw new Error("SVG renderer returned no output");
     }
-    return svg.outerHTML;
+    const result = overlayMathInSvg(svg, scene, texToSvg);
+    if (result.skipped) {
+      console.warn("SVG fork: skipped LaTeX during auto-export", result.skipped);
+    }
+    return { svg, converted: result.converted };
   }
 
   private async renderPNG(
     request: PreparedAutoexportRenderRequest,
+    sourceFile: TFile,
     theme: "light" | "dark",
     context: ThemeExportContext,
   ): Promise<Blob> {
+    const { svg, converted } = await this.renderMathSVG(request, sourceFile, theme, context);
+    if (converted > 0) {
+      return rasterizeMathSvg(svg, request.exportOptions.scale);
+    }
     const png = await getPNG(
       this.createRenderScene(request, theme, context.scene),
       this.getExportSettings(request, false),
