@@ -10,6 +10,7 @@ import { getCJKFontFaceData } from "src/utils/CJKLoader";
 import { getFontDataURL } from "src/utils/utils";
 import { getFontMetrics } from "src/utils/fontMetrics";
 import type ExcalidrawPlugin from "src/core/main";
+import { registerLatexTextItalic } from "../../fonts/latexTextItalic";
 
 declare const mainDocument: Document;
 
@@ -85,6 +86,7 @@ export class FontManager {
    * and registers custom font metrics with the shared Excalidraw runtime.
    */
   public async initializeFonts(): Promise<void> {
+    registerLatexTextItalic(this.getRuntimePackage().excalidrawLib);
     const cjkFontFaceData = await getCJKFontFaceData(this.plugin);
     if (cjkFontFaceData === false) {
       new Notice(

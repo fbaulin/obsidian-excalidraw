@@ -312,6 +312,8 @@ export declare namespace ExcalidrawLib {
     adapter: ObsidianExcalidrawHostAdapter,
   ): () => void;
   function registerLocalFont(fontMetrics: FontMetadata, uri: string): void;
+  const FONT_FAMILY: import("../fonts/latexTextItalic").FontRuntime["FONT_FAMILY"];
+  const Fonts: import("../fonts/latexTextItalic").FontRuntime["Fonts"];
   function getFontFamilies(): string[];
   function registerFontsInCSS(): Promise<void>;
   function getCSSFontDefinition(fontFamily: number): Promise<string>;

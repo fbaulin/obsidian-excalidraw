@@ -10,6 +10,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const nativeRequire = createRequire(import.meta.url);
 const cache = new Map();
 function load(relative) {
+  if (relative.endsWith(".json")) return JSON.parse(fs.readFileSync(path.resolve(root, relative), "utf8"));
   const file = path.resolve(root, relative.endsWith(".ts") ? relative : relative + ".ts");
   if (cache.has(file)) return cache.get(file);
   const compiled = ts.transpileModule(fs.readFileSync(file, "utf8"), {
@@ -26,6 +27,27 @@ function load(relative) {
 }
 
 const host = load("src/compatibility/host");
+test("bundled text italic registers an independent persistent font without replacing Local Font", () => {
+  const { registerLatexTextItalic, LATEX_TEXT_ITALIC, LATEX_TEXT_ITALIC_ID } = load("src/fonts/latexTextItalic");
+  const registered = new Map([[4, { local: true }]]);
+  const calls = [];
+  const runtime = { FONT_FAMILY: { "Local Font": 4, Excalifont: 5 }, Fonts: {
+    registered, register: (name, metadata, face) => {
+      assert.equal(name, LATEX_TEXT_ITALIC);
+      assert.ok(metadata.metrics.ascender > 0);
+      assert.match(face.uri, /^data:font\/otf;base64,/);
+      assert.equal(Buffer.from(face.uri.split(",")[1], "base64").subarray(0, 4).toString(), "OTTO");
+      registered.set(runtime.FONT_FAMILY[name], { metadata, face });
+      calls.push(name);
+    },
+  } };
+  registerLatexTextItalic(runtime);
+  registerLatexTextItalic(runtime);
+  assert.equal(calls.length, 1);
+  assert.equal(runtime.FONT_FAMILY[LATEX_TEXT_ITALIC], LATEX_TEXT_ITALIC_ID);
+  assert.deepEqual(registered.get(4), { local: true });
+  assert.throws(() => registerLatexTextItalic({ FONT_FAMILY: { Other: LATEX_TEXT_ITALIC_ID }, Fonts: runtime.Fonts }), /occupied/);
+});
 test("background autoexports typeset SVG and rasterize math PNG without a live view", async () => {
   const { DOMParser, XMLSerializer } = nativeRequire("@xmldom/xmldom");
   const previousParser = globalThis.DOMParser;
