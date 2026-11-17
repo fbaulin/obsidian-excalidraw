@@ -16,7 +16,8 @@ export function hitTextHandle(el,px,py,sceneToViewport,tolerance=13) {
   const handles=boxHandles(el);let selected=null,best=tolerance*tolerance;
   for(const [name,[x,y]] of Object.entries(handles)){
     const p=sceneToViewport(x,y);const dx=px-p.x,dy=py-p.y;
-    const dist=dx*dx+dy*dy;
+    // Native handles sit outside the bounds; include their rectangular hit area.
+    const dist=Math.max(Math.abs(dx),Math.abs(dy))**2;
     if(dist<best){best=dist;selected=name;}
   }
   return selected;
@@ -28,11 +29,12 @@ export function resizeGeometry(start,handle,dx,dy){
   if(handle==='w'){w=Math.max(MIN_WIDTH,start.width-dx);x=start.x+start.width-w;}
   return {x,y,width:w,height:h};
 }
-export function layoutLiveText(el,start,box,{getFontString,wrapText}){
+export function layoutLiveText(el,start,box,{getFontString,wrapText,measureText}){
   const font=getFontString({fontSize:start.fontSize,fontFamily:start.fontFamily});
   const source=start.originalText;
   const text=wrapText(source,font,box.width);
-  return {...box,fontSize:start.fontSize,autoResize:false,text,originalText:source};
+  const height=measureText(text,font,el.lineHeight||1.25).height;
+  return {...box,height,fontSize:start.fontSize,autoResize:false,text,originalText:source};
 }
 export const snapshotText = el => ({id:el.id,x:el.x,y:el.y,width:el.width,
   height:el.height,fontSize:el.fontSize,fontFamily:el.fontFamily,

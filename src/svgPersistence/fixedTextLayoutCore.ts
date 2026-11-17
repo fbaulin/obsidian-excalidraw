@@ -48,7 +48,7 @@ export function reflowText(el,operation,{getFontString,wrapText,measureText}){
   const text=wrapText(source,font,width);
   const measured=measureText(text,font,el.lineHeight||1.25);
   if(!valid(measured.height)||measured.height<=0)return null;
-  return {fontSize:size,autoResize:false,width,height:Math.max(12,el.height),
+  return {fontSize:size,autoResize:false,width,height:measured.height,
     text,originalText:source};
 }
 /** Latex remains an SVG image. Snap back from image scaling to avoid accidental font scaling.

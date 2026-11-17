@@ -298,10 +298,11 @@ test("text resizing preserves font and permits only horizontal handles", () => {
   const changed = resize.layoutLiveText(start, start, east, {
     getFontString: ({ fontSize }) => { assert.equal(fontSize, 20); return "20px test"; },
     wrapText: (source, font, width) => { assert.equal(width, 120); return source.replace(" ", "\n"); },
+    measureText: text => ({ height: text.split("\n").length * 25 }),
   });
   assert.equal(changed.fontSize, 20);
   assert.equal(changed.originalText, start.originalText);
-  assert.equal(changed.height, 60);
+  assert.equal(changed.height, 50);
   assert.equal(changed.autoResize, false);
 });
 test("text pointer handler consumes disabled handles without starting native or custom resize", () => {
@@ -318,7 +319,7 @@ test("text pointer handler consumes disabled handles without starting native or 
   const element = { id: "t", type: "text", x: 100, y: 100, width: 200, height: 100 };
   for (const [handle, [clientX, clientY]] of Object.entries(load("src/svgPersistence/liveResizeCore").boxHandles(element))) {
     const listeners = new Set();
-    const doc = { addEventListener: name => listeners.add(name), removeEventListener: name => listeners.delete(name) };
+    const doc = { addEventListener: (name, fn) => listeners.add(fn), removeEventListener: (name, fn) => listeners.delete(fn) };
     const root = { ownerDocument: doc, contains: () => true };
     const view = { contentEl: root, file: {}, excalidrawAPI: {
       getAppState: () => ({ activeTool: { type: "selection" }, selectedElementIds: { t: true } }),
@@ -331,10 +332,63 @@ test("text pointer handler consumes disabled handles without starting native or 
       target: { closest: () => root }, preventDefault: () => consumed++,
       stopPropagation: () => {}, stopImmediatePropagation: () => {} });
     assert.equal(consumed, 1, handle);
-    assert.equal(listeners.has("pointermove"), handle === "e" || handle === "w", handle);
+    assert.equal(listeners.has(resize.onMove), handle === "e" || handle === "w", handle);
+    // Native handles are offset outside the text bounds, including after reflow.
+    resize.end(false);
+    element.height = 160;
+    consumed = 0;
+    resize.onDown({ button: 0, isPrimary: true, pointerId: 2,
+      clientX: element.x + element.width + 12, clientY: element.y + element.height + 12,
+      target: { closest: () => root }, preventDefault: () => consumed++,
+      stopPropagation: () => {}, stopImmediatePropagation: () => {} });
+    assert.equal(consumed, 1);
+    assert.equal(listeners.has(resize.onMove), false);
+    element.height = 100;
+    const styles = new Map();
+    const target = { closest: () => root, style: {
+      getPropertyValue: key => styles.get(key)?.[0] || "",
+      getPropertyPriority: key => styles.get(key)?.[1] || "",
+      setProperty: (key, value, priority) => styles.set(key, [value, priority]),
+    } };
+    resize.onHover({ clientX: 200, clientY: 88, target, stopImmediatePropagation() {} });
+    assert.deepEqual(styles.get("cursor"), ["default", "important"]);
+    resize.onHover({ clientX: 312, clientY: 150, target, stopImmediatePropagation() {} });
+    assert.deepEqual(styles.get("cursor"), ["ew-resize", "important"]);
     resize.dispose();
+    assert.deepEqual(styles.get("cursor"), ["", ""]);
     assert.equal(listeners.size, 0);
   }
+});
+test("text height follows edited content and shrinks again without changing width", async () => {
+  const source = fs.readFileSync(path.join(root, "src/svgPersistence/liveTextResize.ts"), "utf8");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  });
+  const module = { exports: {} };
+  const require = name => name.endsWith("liveResizeCore") ? load("src/svgPersistence/liveResizeCore") : {
+    CaptureUpdateAction: { NEVER: "NEVER" }, getFontString: () => "20px test",
+    measureText: text => ({ height: text.split("\n").length * 25 }),
+  };
+  new Function("require", "module", "exports", compiled.outputText)(require, module, module.exports);
+  let elements = [{ id: "t", type: "text", width: 120, height: 300, fontSize: 20, text: "one", version: 1 }];
+  const state = {};
+  const doc = { addEventListener() {}, removeEventListener() {} };
+  const view = { file: {}, contentEl: { ownerDocument: doc }, excalidrawAPI: {
+    getAppState: () => state, getSceneElements: () => elements,
+  }, updateScene: update => { elements = update.elements; }, setDirty() {} };
+  const resize = new module.exports.LiveTextResize(view);
+  const settle = async () => { resize.onChange(); await new Promise(resolve => setTimeout(resolve, 10)); };
+  await settle();
+  assert.equal(elements[0].height, 25);
+  elements[0].text = "one\ntwo\nthree";
+  await settle();
+  assert.equal(elements[0].height, 75);
+  elements[0].text = "one";
+  await settle();
+  assert.equal(elements[0].height, 25);
+  assert.equal(elements[0].width, 120);
+  assert.equal(elements[0].fontSize, 20);
+  resize.dispose();
 });
 test("arrow label tracks changed endpoints without moving its editable source", () => {
   const text = { x: 5, y: 6, width: 40, height: 20 };

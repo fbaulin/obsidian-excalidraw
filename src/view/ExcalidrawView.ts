@@ -6028,7 +6028,7 @@ export default class ExcalidrawView
   private readonly svgCanvasMath = new CanvasMathOverlay(this);
   public onChange(et: ExcalidrawElement[], st: AppState, files: BinaryFiles) {
     this.svgCanvasMath.onChange(et, st); // v0.8: render inline math in editor
-    this.svgLiveTextResize.ensure(); // SVG fork: live, independent text box resizing
+    this.svgLiveTextResize.onChange(); // Keep text height fitted after edits and horizontal resizing.
     this.svgFixedText.onChange(et, st); // SVG fork: fixed font and resize reflow
     this.selectedElementActionsMenu?.update(et, st);
     if (st.activeTool?.type) {

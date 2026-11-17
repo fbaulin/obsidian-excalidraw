@@ -1,6 +1,6 @@
 // @ts-nocheck
 import {CaptureUpdateAction,viewportCoordsToSceneCoords,sceneCoordsToViewportCoords,
-  wrapText,getFontString} from '../constants/constants';
+  wrapText,getFontString,measureText} from '../constants/constants';
 import {eligibleText,hitTextHandle,isHorizontalTextHandle,resizeGeometry,layoutLiveText,snapshotText}
   from './liveResizeCore';
 
@@ -13,6 +13,10 @@ export class LiveTextResize {
   private doc:Document|null=null;
   private drag:any=null;
   private working=false;
+  private cursorTarget:HTMLElement|null=null;
+  private oldCursor='';
+  private oldPriority='';
+  private fitTimer:ReturnType<typeof setTimeout>|null=null;
   constructor(private view:any){}
   ensure(){
     const root=this.view.contentEl as HTMLElement;
@@ -21,6 +25,57 @@ export class LiveTextResize {
     // Document capture precedes React canvas handlers, avoiding aspect-locked native resize.
     this.listenDoc=root.ownerDocument;
     this.listenDoc.addEventListener('pointerdown',this.onDown,true);
+    this.listenDoc.addEventListener('pointermove',this.onHover,true);
+  }
+  private clearCursor(){
+    if(this.cursorTarget){
+      this.cursorTarget.style.setProperty('cursor',this.oldCursor,this.oldPriority);
+      this.cursorTarget=null;
+    }
+  }
+  private onHover=(event:PointerEvent)=>{
+    this.clearCursor();
+    if(this.drag)return;
+    const target=event.target as HTMLElement;
+    const api=this.view.excalidrawAPI;
+    if(!target?.style||!this.root?.contains(target)||!target.closest('.excalidraw')||!api)return;
+    const state=api.getAppState();
+    if(state.editingTextElement||state.activeTool?.type!=='selection')return;
+    const selected=api.getSceneElements().filter(el=>!el.isDeleted&&state.selectedElementIds?.[el.id]);
+    if(selected.length!==1||!eligibleText(selected[0]))return;
+    const handle=hitTextHandle(selected[0],event.clientX,event.clientY,
+      (x,y)=>sceneCoordsToViewportCoords({sceneX:x,sceneY:y},state),22);
+    if(!handle)return;
+    this.cursorTarget=target;
+    this.oldCursor=target.style.getPropertyValue('cursor');
+    this.oldPriority=target.style.getPropertyPriority('cursor');
+    target.style.setProperty('cursor',isHorizontalTextHandle(handle)?'ew-resize':'default','important');
+    event.stopImmediatePropagation();
+  };
+  onChange(){
+    this.ensure();
+    if(this.working||this.fitTimer!==null)return;
+    const file=this.view.file;
+    this.fitTimer=setTimeout(()=>{
+      this.fitTimer=null;
+      const api=this.view.excalidrawAPI;
+      if(!file||file!==this.view.file||!api||this.drag||this.view.semaphores?.viewunload)return;
+      const state=api.getAppState();
+      if(state.editingTextElement||state.isResizing||state.isRotating)return;
+      let changed=false;
+      const elements=api.getSceneElements().map(el=>{
+        if(!eligibleText(el))return el;
+        const height=measureText(el.text,getFontString(el),el.lineHeight||1.25).height;
+        if(!Number.isFinite(height)||height<=0||Math.abs(height-el.height)<0.01)return el;
+        changed=true;
+        return {...el,height,version:el.version+1,versionNonce:Math.floor(Math.random()*2147483647),updated:Date.now()};
+      });
+      if(changed){
+        this.working=true;
+        try{this.view.updateScene({elements,captureUpdate:CaptureUpdateAction.NEVER});this.view.setDirty();}
+        finally{this.working=false;}
+      }
+    },0);
   }
   private onDown=(event:PointerEvent)=>{
     const target=event.target as HTMLElement | null;
@@ -39,7 +94,7 @@ export class LiveTextResize {
     let handle=null,startingPoint=null;
     try {
       handle=hitTextHandle(element,event.clientX,event.clientY,(x:number,y:number)=>
-        sceneCoordsToViewportCoords({sceneX:x,sceneY:y},state),14);
+        sceneCoordsToViewportCoords({sceneX:x,sceneY:y},state),22);
       startingPoint=viewportCoordsToSceneCoords({clientX:event.clientX,
         clientY:event.clientY},state);
     } catch(error){console.warn('SVG fork: resize coordinates unavailable',error);return;}
@@ -73,7 +128,7 @@ export class LiveTextResize {
     const elements=api.getSceneElements();
     const target=elements.find((el:any)=>el.id===start.id);
     if(!target || target.isDeleted){this.end(false);return;}
-    const changes=layoutLiveText(target,start,box,{getFontString,wrapText});
+    const changes=layoutLiveText(target,start,box,{getFontString,wrapText,measureText});
     const next={...target,...changes,version:target.version+1,
       versionNonce:Math.floor(Math.random()*2147483647),updated:Date.now()};
     try{
@@ -113,8 +168,11 @@ export class LiveTextResize {
   private consume(event:PointerEvent){event.preventDefault();event.stopPropagation();
     event.stopImmediatePropagation();}
   dispose(){
+    if(this.fitTimer!==null){clearTimeout(this.fitTimer);this.fitTimer=null;}
+    this.clearCursor();
     this.end(false);
     this.listenDoc?.removeEventListener('pointerdown',this.onDown,true);
+    this.listenDoc?.removeEventListener('pointermove',this.onHover,true);
     this.listenDoc=null;
     this.root=null;
   }
