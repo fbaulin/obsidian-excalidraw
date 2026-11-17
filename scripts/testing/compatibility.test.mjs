@@ -27,8 +27,10 @@ function load(relative) {
 }
 
 const host = load("src/compatibility/host");
-test("bundled text italic registers an independent persistent font without replacing Local Font", () => {
+test("bundled variable italic keeps the saved font ID without replacing Local Font", () => {
   const { registerLatexTextItalic, LATEX_TEXT_ITALIC, LATEX_TEXT_ITALIC_ID } = load("src/fonts/latexTextItalic");
+  assert.equal(LATEX_TEXT_ITALIC, "LaTeX Math Italic");
+  assert.equal(LATEX_TEXT_ITALIC_ID, 10001);
   const registered = new Map([[4, { local: true }]]);
   const calls = [];
   const runtime = { FONT_FAMILY: { "Local Font": 4, Excalifont: 5 }, Fonts: {
@@ -37,6 +39,7 @@ test("bundled text italic registers an independent persistent font without repla
       assert.ok(metadata.metrics.ascender > 0);
       assert.match(face.uri, /^data:font\/otf;base64,/);
       assert.equal(Buffer.from(face.uri.split(",")[1], "base64").subarray(0, 4).toString(), "OTTO");
+      assert.ok(Buffer.from(face.uri.split(",")[1], "base64").includes(Buffer.from("MathJax_Math")));
       registered.set(runtime.FONT_FAMILY[name], { metadata, face });
       calls.push(name);
     },
