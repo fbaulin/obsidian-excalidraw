@@ -1,6 +1,7 @@
 // @ts-nocheck
-/** Independent, fixed-font box resize geometry for unrotated text. No host dependencies. */
-const MIN_WIDTH=24, MIN_HEIGHT=12;
+/** Horizontal, fixed-font box resize geometry for unrotated text. No host dependencies. */
+const MIN_WIDTH=24;
+export const isHorizontalTextHandle = (handle: string): boolean => handle==='e' || handle==='w';
 export const eligibleText = el => !!el && el.type==='text' && !el.isDeleted &&
   !el.containerId && !(el.groupIds?.length) && (!el.angle || Math.abs(el.angle)<1e-7);
 export const boxHandles = el => ({
@@ -23,10 +24,8 @@ export function hitTextHandle(el,px,py,sceneToViewport,tolerance=13) {
 /** Coordinate formula uses pointer delta from pointerdown, never iterative element geometry. */
 export function resizeGeometry(start,handle,dx,dy){
   let x=start.x,y=start.y,w=start.width,h=start.height;
-  if(handle.includes('e')) w=Math.max(MIN_WIDTH,start.width+dx);
-  if(handle.includes('w')){w=Math.max(MIN_WIDTH,start.width-dx);x=start.x+start.width-w;}
-  if(handle.includes('s')) h=Math.max(MIN_HEIGHT,start.height+dy);
-  if(handle.includes('n')){h=Math.max(MIN_HEIGHT,start.height-dy);y=start.y+start.height-h;}
+  if(handle==='e') w=Math.max(MIN_WIDTH,start.width+dx);
+  if(handle==='w'){w=Math.max(MIN_WIDTH,start.width-dx);x=start.x+start.width-w;}
   return {x,y,width:w,height:h};
 }
 export function layoutLiveText(el,start,box,{getFontString,wrapText}){

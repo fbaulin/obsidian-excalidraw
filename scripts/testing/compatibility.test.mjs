@@ -281,11 +281,18 @@ test("invalid or foreign scene metadata fails closed", () => {
 });
 
 const geometry = load("src/svgPersistence/mathOverlayGeometry");
-test("text resizing preserves font and independently changes height or width", () => {
+test("text resizing preserves font and permits only horizontal handles", () => {
   const resize = load("src/svgPersistence/liveResizeCore");
   const start = { id: "t", type: "text", x: 10, y: 20, width: 200, height: 60, fontSize: 20, fontFamily: 1, originalText: "Power $P=UI$" };
-  const south = resize.resizeGeometry(start, "s", 90, 40);
-  assert.deepEqual(south, { x: 10, y: 20, width: 200, height: 100 });
+  for (const handle of ["n", "s", "nw", "ne", "sw", "se"]) {
+    assert.equal(resize.isHorizontalTextHandle(handle), false);
+    assert.deepEqual(resize.resizeGeometry(start, handle, 90, 40),
+      { x: 10, y: 20, width: 200, height: 60 });
+  }
+  assert.equal(resize.isHorizontalTextHandle("e"), true);
+  assert.equal(resize.isHorizontalTextHandle("w"), true);
+  assert.deepEqual(resize.resizeGeometry(start, "w", 80, 40),
+    { x: 90, y: 20, width: 120, height: 60 });
   const east = resize.resizeGeometry(start, "e", -80, 40);
   assert.deepEqual(east, { x: 10, y: 20, width: 120, height: 60 });
   const changed = resize.layoutLiveText(start, start, east, {
@@ -296,6 +303,38 @@ test("text resizing preserves font and independently changes height or width", (
   assert.equal(changed.originalText, start.originalText);
   assert.equal(changed.height, 60);
   assert.equal(changed.autoResize, false);
+});
+test("text pointer handler consumes disabled handles without starting native or custom resize", () => {
+  const source = fs.readFileSync(path.join(root, "src/svgPersistence/liveTextResize.ts"), "utf8");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  });
+  const module = { exports: {} };
+  const require = name => name.endsWith("liveResizeCore") ? load("src/svgPersistence/liveResizeCore") : {
+    sceneCoordsToViewportCoords: ({ sceneX, sceneY }) => ({ x: sceneX, y: sceneY }),
+    viewportCoordsToSceneCoords: ({ clientX, clientY }) => ({ x: clientX, y: clientY }),
+  };
+  new Function("require", "module", "exports", compiled.outputText)(require, module, module.exports);
+  const element = { id: "t", type: "text", x: 100, y: 100, width: 200, height: 100 };
+  for (const [handle, [clientX, clientY]] of Object.entries(load("src/svgPersistence/liveResizeCore").boxHandles(element))) {
+    const listeners = new Set();
+    const doc = { addEventListener: name => listeners.add(name), removeEventListener: name => listeners.delete(name) };
+    const root = { ownerDocument: doc, contains: () => true };
+    const view = { contentEl: root, file: {}, excalidrawAPI: {
+      getAppState: () => ({ activeTool: { type: "selection" }, selectedElementIds: { t: true } }),
+      getSceneElements: () => [element],
+    } };
+    const resize = new module.exports.LiveTextResize(view);
+    resize.ensure();
+    let consumed = 0;
+    resize.onDown({ button: 0, isPrimary: true, pointerId: 1, clientX, clientY,
+      target: { closest: () => root }, preventDefault: () => consumed++,
+      stopPropagation: () => {}, stopImmediatePropagation: () => {} });
+    assert.equal(consumed, 1, handle);
+    assert.equal(listeners.has("pointermove"), handle === "e" || handle === "w", handle);
+    resize.dispose();
+    assert.equal(listeners.size, 0);
+  }
 });
 test("arrow label tracks changed endpoints without moving its editable source", () => {
   const text = { x: 5, y: 6, width: 40, height: 20 };

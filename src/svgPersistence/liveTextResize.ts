@@ -1,12 +1,11 @@
 // @ts-nocheck
 import {CaptureUpdateAction,viewportCoordsToSceneCoords,sceneCoordsToViewportCoords,
   wrapText,getFontString} from '../constants/constants';
-import {eligibleText,hitTextHandle,resizeGeometry,layoutLiveText,snapshotText}
+import {eligibleText,hitTextHandle,isHorizontalTextHandle,resizeGeometry,layoutLiveText,snapshotText}
   from './liveResizeCore';
 
-/** Intercepts native pointer-down on a selected text box's eight handles.
- * Unlike the core Excalidraw resizeSingleTextElement, this does not change fontSize
- * and does not couple width and height. Only standalone unrotated text is eligible.
+/** Allows only left/right resizing of standalone unrotated text at fixed font size.
+ * Consume the other six handles so they cannot fall through to native scaling.
  */
 export class LiveTextResize {
   private root:HTMLElement|null=null;
@@ -45,6 +44,10 @@ export class LiveTextResize {
         clientY:event.clientY},state);
     } catch(error){console.warn('SVG fork: resize coordinates unavailable',error);return;}
     if(!handle || !startingPoint)return;
+    if(!isHorizontalTextHandle(handle)){
+      this.consume(event);
+      return;
+    }
     const doc=this.view.contentEl.ownerDocument;
     this.doc=doc;
     this.drag={pointerId:event.pointerId,file:this.view.file,handle,
