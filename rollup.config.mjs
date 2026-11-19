@@ -13,6 +13,7 @@ import { minify } from 'uglify-js';
 import json from '@rollup/plugin-json';
 import { parseEnv } from 'node:util';
 import { buildReactRuntime } from './scripts/buildReactRuntime.mjs';
+import { withTextGrip } from './scripts/textGripRuntime.mjs';
 
 function compressDeflateBase64(code) {
   // Compress using Node's native zlib at maximum compression
@@ -87,12 +88,12 @@ function compressLanguageFile(lang) {
   return compressDeflateBase64(minifyCode(`x = ${content};`));
 }
 
-const excalidrawSource = isLib ? "" : fs.readFileSync(
+const excalidrawSource = isLib ? "" : withTextGrip(fs.readFileSync(
   isProd
     ? "./node_modules/@zsviczian/excalidraw/dist/obsidian/excalidraw.production.min.js"
     : "./node_modules/@zsviczian/excalidraw/dist/obsidian/excalidraw.development.js",
   "utf8",
-);
+), isProd);
 const excalidraw_pkg = isLib
   ? ""
   : isProd

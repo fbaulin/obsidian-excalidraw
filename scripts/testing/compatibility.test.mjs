@@ -3,11 +3,35 @@ import test from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import { withTextGrip } from '../textGripRuntime.mjs';
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const nativeRequire = createRequire(import.meta.url);
+test('engine border hit-test: opt out for standalone text only, in both bundles', () => {
+  // Run the shipped resizeTest function. Supply axis-aligned geometry helpers
+  // and no visible handles, so a positive result must come from its side fallback.
+  const deps=[()=>({}),()=>({}),()=>true,()=>[0,0,100,40,50,20],()=>false,()=>false,4,
+    (x,y)=>[x,y],([l,t],[r,b])=>({n:[[l,t],[r,t]],e:[[r,t],[r,b]],s:[[l,b],[r,b]],w:[[l,t],[l,b]]}),
+    ([x,y],[[l,t],[r,b]])=>x>=l&&x<=r&&y>=t&&y<=b];
+  for(const prod of [false,true]){
+    const file=prod?'excalidraw.production.min.js':'excalidraw.development.js';
+    const source=fs.readFileSync(path.join(root,'node_modules/@zsviczian/excalidraw/dist/obsidian',file),'utf8');
+    const start=prod?'rLA=':'resizeTest = (element';
+    const stop=prod?',WO=':';\n      getElementWithTransformHandleType =';
+    const names=prod?'iL jB oL te KA Fe tw k qO EB':'getTransformHandles getOmitSidesForEditorInterface canResizeFromSides getElementAbsoluteCoords isLinearElement isImageElement SIDE_RESIZING_THRESHOLD pointFrom getSelectionBorders pointOnLineSegment';
+    function getTest(s){const a=s.indexOf(start),z=s.indexOf(stop,a);assert.ok(a>=0&&z>a);return new Function(...names.split(' '),'return '+s.slice(s.indexOf('=',a)+1,z))(...deps);}
+    const original=getTest(source), patched=getTest(withTextGrip(source,prod));
+    for(const [side,x,y] of [['n',50,-4],['s',50,44],['w',-4,20],['e',104,20]]){
+      for(const [props,disable] of [[{type:'text'},true],[{type:'rectangle'},false],[{type:'text',groupIds:['g']},false],[{type:'text',containerId:'shape'},false],[{type:'text',angle:0.2},false]]){
+        const args=[{id:'a',...props},new Map(),{selectedElementIds:{a:true}},x,y,{value:1},'mouse',{}];
+        assert.equal(original(...args),side,file);
+        assert.equal(patched(...args),disable?false:side,file);
+      }
+    }
+  }
+});
 const cache = new Map();
 function load(relative) {
   if (relative.endsWith(".json")) return JSON.parse(fs.readFileSync(path.resolve(root, relative), "utf8"));
@@ -152,6 +176,40 @@ test("native SVG and PNG copy actions use host exporter for selection and full c
   assert.equal(png.keyTest({ code: "KeyC", altKey: false, shiftKey: true }), false);
   assert.equal(png.keyTest({ code: "KeyV", altKey: true, shiftKey: true }), false);
   assert.equal(actions.get("copyAsSvg").keyTest, undefined);
+});
+test("short text has an external grip: click fits, captured drag reflows, Alt drag centers", () => {
+  const source=fs.readFileSync(path.join(root,"src/svgPersistence/textWidthGrip.ts"),"utf8");
+  const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}});
+  const mod={exports:{}};
+  const constants={CaptureUpdateAction:{IMMEDIATELY:'now',NEVER:'never'},sceneCoordsToViewportCoords:({sceneX,sceneY})=>({x:sceneX,y:sceneY}),getFontString:()=>"20px test",wrapText:t=>t,measureText:t=>({width:10*t.length,height:25})};
+  new Function('require','module','exports',compiled.outputText)(n=>n.endsWith('liveResizeCore')?load('src/svgPersistence/liveResizeCore'):constants,mod,mod.exports);
+  let el={id:'t',type:'text',x:100,y:40,width:24,height:25,text:'x',originalText:'x',fontSize:20,version:1};
+  const parent={getBoundingClientRect:()=>({left:0,top:0}),clientLeft:0,clientTop:0,scrollLeft:0,scrollTop:0};
+  const btn={ownerDocument:{defaultView:null},style:{},offsetParent:parent,setAttribute(){},setPointerCapture(){},hasPointerCapture(){return false;},remove(){}};
+  const state={activeTool:{type:'selection'},zoom:{value:1},selectedElementIds:{t:true}};
+  const view={contentEl:{isConnected:true,ownerDocument:{createElement:()=>btn},appendChild(){}},file:{},excalidrawAPI:{getAppState:()=>state,getSceneElements:()=>[el]},setDirty(){},updateScene:({elements})=>{el=elements[0];}};
+  const grip=new mod.exports.TextWidthGrip(view);grip.sync();
+  assert.ok(parseFloat(btn.style.left)>el.x+el.width);
+  const event=(x,alt=false)=>({clientX:x,pointerId:1,isPrimary:true,button:0,altKey:alt});
+  btn.onpointerdown(event(136));btn.onpointerup(event(137));assert.equal(el.width,10);assert.equal(el.autoResize,true);
+  btn.onpointerdown(event(122));btn.onpointermove(event(142));btn.onpointerup(event(142));assert.deepEqual([el.x,el.width],[100,30]);
+  btn.onpointerdown(event(142));btn.onpointermove(event(152,true));btn.onpointerup(event(152,true));assert.deepEqual([el.x,el.width],[90,50]);
+  btn.onpointerdown(event(152));btn.onpointermove(event(162));btn.onpointercancel(event(162));assert.deepEqual([el.x,el.width],[90,50]);
+  state.selectedElementIds={};grip.sync();assert.equal(btn.hidden,true);grip.dispose();
+});
+test("right width grip anchors the left edge or, with Alt, the horizontal midpoint", () => {
+  const { resizeGeometry } = load("src/svgPersistence/liveResizeCore");
+  const start = { x: 100, y: 40, width: 100, height: 25 };
+  const edges = (dx, alt) => {
+    const box = resizeGeometry(start, "e", dx, 70, alt);
+    assert.equal(box.y, 40);
+    return [box.x, box.x + box.width];
+  };
+  assert.deepEqual(edges(10, false), [100, 210]);
+  assert.deepEqual(edges(10, true), [90, 210]);
+  assert.deepEqual(edges(-10, true), [110, 190]);
+  assert.deepEqual(edges(-100, true), [138, 162]);
+  assert.deepEqual(edges(10, false), [100, 210]);
 });
 test("math detection does not discard rendered text when originalText is stale", () => {
   const { hasMathText } = load("src/svgPersistence/mathSceneHasText");
@@ -330,67 +388,13 @@ test("text resizing preserves font and permits only horizontal handles", () => {
   assert.equal(changed.height, 50);
   assert.equal(changed.autoResize, false);
 });
-test("text pointer handler consumes disabled handles without starting native or custom resize", () => {
-  const source = fs.readFileSync(path.join(root, "src/svgPersistence/liveTextResize.ts"), "utf8");
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-  });
-  const module = { exports: {} };
-  const require = name => name.endsWith("liveResizeCore") ? load("src/svgPersistence/liveResizeCore") : {
-    sceneCoordsToViewportCoords: ({ sceneX, sceneY }) => ({ x: sceneX, y: sceneY }),
-    viewportCoordsToSceneCoords: ({ clientX, clientY }) => ({ x: clientX, y: clientY }),
-  };
-  new Function("require", "module", "exports", compiled.outputText)(require, module, module.exports);
-  const element = { id: "t", type: "text", x: 100, y: 100, width: 200, height: 100 };
-  for (const [handle, [clientX, clientY]] of Object.entries(load("src/svgPersistence/liveResizeCore").boxHandles(element))) {
-    const listeners = new Set();
-    const doc = { addEventListener: (name, fn) => listeners.add(fn), removeEventListener: (name, fn) => listeners.delete(fn) };
-    const root = { ownerDocument: doc, contains: () => true };
-    const view = { contentEl: root, file: {}, excalidrawAPI: {
-      getAppState: () => ({ activeTool: { type: "selection" }, selectedElementIds: { t: true } }),
-      getSceneElements: () => [element],
-    } };
-    const resize = new module.exports.LiveTextResize(view);
-    resize.ensure();
-    let consumed = 0;
-    resize.onDown({ button: 0, isPrimary: true, pointerId: 1, clientX, clientY,
-      target: { closest: () => root }, preventDefault: () => consumed++,
-      stopPropagation: () => {}, stopImmediatePropagation: () => {} });
-    assert.equal(consumed, 1, handle);
-    assert.equal(listeners.has(resize.onMove), handle === "e" || handle === "w", handle);
-    // Native handles are offset outside the text bounds, including after reflow.
-    resize.end(false);
-    element.height = 160;
-    consumed = 0;
-    resize.onDown({ button: 0, isPrimary: true, pointerId: 2,
-      clientX: element.x + element.width + 12, clientY: element.y + element.height + 12,
-      target: { closest: () => root }, preventDefault: () => consumed++,
-      stopPropagation: () => {}, stopImmediatePropagation: () => {} });
-    assert.equal(consumed, 1);
-    assert.equal(listeners.has(resize.onMove), false);
-    element.height = 100;
-    const styles = new Map();
-    const target = { closest: () => root, style: {
-      getPropertyValue: key => styles.get(key)?.[0] || "",
-      getPropertyPriority: key => styles.get(key)?.[1] || "",
-      setProperty: (key, value, priority) => styles.set(key, [value, priority]),
-    } };
-    resize.onHover({ clientX: 200, clientY: 88, target, stopImmediatePropagation() {} });
-    assert.deepEqual(styles.get("cursor"), ["default", "important"]);
-    resize.onHover({ clientX: 312, clientY: 150, target, stopImmediatePropagation() {} });
-    assert.deepEqual(styles.get("cursor"), ["ew-resize", "important"]);
-    resize.dispose();
-    assert.deepEqual(styles.get("cursor"), ["", ""]);
-    assert.equal(listeners.size, 0);
-  }
-});
 test("text height follows edited content and shrinks again without changing width", async () => {
   const source = fs.readFileSync(path.join(root, "src/svgPersistence/liveTextResize.ts"), "utf8");
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   });
   const module = { exports: {} };
-  const require = name => name.endsWith("liveResizeCore") ? load("src/svgPersistence/liveResizeCore") : {
+  const require = name => name.endsWith("textWidthGrip") ? {TextWidthGrip: class {sync(){} dispose(){}}} : name.endsWith("liveResizeCore") ? load("src/svgPersistence/liveResizeCore") : {
     CaptureUpdateAction: { NEVER: "NEVER" }, getFontString: () => "20px test",
     measureText: text => ({ height: text.split("\n").length * 25 }),
   };

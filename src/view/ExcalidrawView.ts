@@ -2450,6 +2450,7 @@ export default class ExcalidrawView
 
   //onClose happens after onunload
   protected async onClose(): Promise<void> {
+    this.svgLiveTextResize.dispose();
     //I noticed Obsidian calls this function twice when disabling the plugin
     //once from "unregisterView"
     //the from "detachLeavesOfType"

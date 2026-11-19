@@ -23,10 +23,14 @@ export function hitTextHandle(el,px,py,sceneToViewport,tolerance=13) {
   return selected;
 }
 /** Coordinate formula uses pointer delta from pointerdown, never iterative element geometry. */
-export function resizeGeometry(start,handle,dx,dy){
+export function resizeGeometry(start,handle,dx,dy,fromCenter=false){
   let x=start.x,y=start.y,w=start.width,h=start.height;
-  if(handle==='e') w=Math.max(MIN_WIDTH,start.width+dx);
-  if(handle==='w'){w=Math.max(MIN_WIDTH,start.width-dx);x=start.x+start.width-w;}
+  if(isHorizontalTextHandle(handle)){
+    const outward=handle==='e'?dx:-dx;
+    w=Math.max(MIN_WIDTH,start.width+outward*(fromCenter?2:1));
+    if(fromCenter)x=start.x+(start.width-w)/2;
+    else if(handle==='w')x=start.x+start.width-w;
+  }
   return {x,y,width:w,height:h};
 }
 export function layoutLiveText(el,start,box,{getFontString,wrapText,measureText}){
